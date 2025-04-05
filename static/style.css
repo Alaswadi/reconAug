@@ -257,8 +257,16 @@ button:hover {
     display: block;
 }
 
-.search-filter {
+.search-filter-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
+}
+
+.search-filter {
+    flex-grow: 1;
+    margin-right: 10px;
 }
 
 .search-filter input {
@@ -267,6 +275,29 @@ button:hover {
     border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 16px;
+}
+
+.refresh-button-container {
+    flex-shrink: 0;
+}
+
+.refresh-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.refresh-button:hover {
+    background-color: #45a049;
+}
+
+.refresh-button i {
+    margin-right: 5px;
 }
 
 table {
@@ -471,6 +502,14 @@ a:hover {
 .scan-date {
     white-space: nowrap;
     color: #666;
+}
+
+/* No data message */
+.no-data {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
 }
 
 /* Action buttons */

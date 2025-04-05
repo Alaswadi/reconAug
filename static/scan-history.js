@@ -25,6 +25,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load scan history when the page loads
     loadScanHistory();
 
+    // Refresh scan history every 30 seconds
+    setInterval(loadScanHistory, 30000);
+
+    // Add refresh button functionality
+    const refreshButton = document.getElementById('refreshButton');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', function() {
+            console.log('Manual refresh triggered');
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            this.disabled = true;
+
+            loadScanHistory();
+
+            // Re-enable button after 2 seconds
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+                this.disabled = false;
+            }, 2000);
+        });
+    }
+
     // Close modal when clicking the close button
     document.querySelector('#scanDetailsModal .close-button').addEventListener('click', function() {
         scanDetailsModal.classList.add('hidden');
@@ -124,8 +145,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateScanHistoryTable(scans) {
         scanHistoryTable.innerHTML = '';
 
-        if (scans.length === 0) {
-            scanHistoryTable.innerHTML = '<tr><td colspan="5">No scan history found</td></tr>';
+        if (!scans || scans.length === 0) {
+            scanHistoryTable.innerHTML = '<tr><td colspan="5" class="no-data">No scan history found. Try scanning a domain from the home page.</td></tr>';
             return;
         }
 

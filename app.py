@@ -442,6 +442,36 @@ def index():
 def scan_history_page():
     return render_template('history.html')
 
+@app.route('/debug/database')
+def debug_database():
+    """Debug endpoint to check database contents"""
+    try:
+        # Get all scans
+        scans = Scan.query.all()
+        scan_data = []
+
+        for scan in scans:
+            scan_info = scan.to_dict()
+            scan_info['subdomains_count_actual'] = Subdomain.query.filter_by(scan_id=scan.id).count()
+            scan_info['live_hosts_count_actual'] = LiveHost.query.filter_by(scan_id=scan.id).count()
+            scan_data.append(scan_info)
+
+        # Get database stats
+        stats = {
+            'total_scans': Scan.query.count(),
+            'total_subdomains': Subdomain.query.count(),
+            'total_live_hosts': LiveHost.query.count(),
+            'total_ports': Port.query.count(),
+            'total_historical_urls': HistoricalUrl.query.count()
+        }
+
+        return jsonify({
+            'stats': stats,
+            'scans': scan_data
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def run_scan_in_background(task_id, domain):
     """Run the scan in a background thread and update progress"""
     try:
@@ -517,8 +547,15 @@ def run_scan_in_background(task_id, domain):
 
         # Save results to database
         try:
+            print(f"Saving scan results to database for domain: {domain}")
+            print(f"Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts")
             scan_id = save_scan_to_database(domain, all_domains, live_hosts)
-            db_message = f'Scan complete. Results saved to database (ID: {scan_id}).' if scan_id else 'Scan complete. Note: Failed to save results to database.'
+            if scan_id:
+                print(f"Scan results saved successfully with ID: {scan_id}")
+                db_message = f'Scan complete. Results saved to database (ID: {scan_id}).'
+            else:
+                print("Failed to save scan results to database")
+                db_message = 'Scan complete. Note: Failed to save results to database.'
         except Exception as db_error:
             print(f"Error saving to database: {db_error}")
             db_message = 'Scan complete. Note: Failed to save results to database.'
@@ -707,6 +744,8 @@ def create_tables():
 def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
     """Save scan results to the database"""
     try:
+        print(f"Starting database save for domain: {domain}")
+
         # Create a new scan record
         scan = Scan(
             domain=domain,
@@ -717,8 +756,10 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
         )
         db.session.add(scan)
         db.session.flush()  # Get the scan ID without committing
+        print(f"Created scan record with ID: {scan.id}")
 
         # Add subdomains
+        print(f"Adding {len(subdomains)} subdomains to database")
         for subdomain in subdomains:
             db.session.add(Subdomain(
                 scan_id=scan.id,
@@ -727,18 +768,25 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
             ))
 
         # Add live hosts
+        print(f"Adding {len(live_hosts)} live hosts to database")
         for host in live_hosts:
-            live_host = LiveHost(
-                scan_id=scan.id,
-                url=host['url'],
-                status_code=host['status_code'],
-                technology=host['technology']
-            )
-            db.session.add(live_host)
-            db.session.flush()  # Get the live host ID
+            try:
+                live_host = LiveHost(
+                    scan_id=scan.id,
+                    url=host['url'],
+                    status_code=host['status_code'],
+                    technology=host['technology']
+                )
+                db.session.add(live_host)
+                db.session.flush()  # Get the live host ID
+            except KeyError as ke:
+                print(f"KeyError in live host data: {ke}. Host data: {host}")
+                # Continue with other hosts even if one fails
+                continue
 
         # Add historical URLs if available
         if historical_urls:
+            print(f"Adding {len(historical_urls)} historical URLs to database")
             for url in historical_urls:
                 db.session.add(HistoricalUrl(
                     scan_id=scan.id,
@@ -747,11 +795,13 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
 
         # Commit all changes
         db.session.commit()
-        print(f"Scan results for {domain} saved to database")
+        print(f"Scan results for {domain} saved to database successfully")
         return scan.id
     except Exception as e:
         db.session.rollback()
         print(f"Error saving scan results to database: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 # Helper function to save port scan results to database

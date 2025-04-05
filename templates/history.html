@@ -18,8 +18,13 @@
         </header>
 
         <div class="content-box">
-            <div class="search-filter">
-                <input type="text" id="scanHistoryFilter" placeholder="Filter by domain...">
+            <div class="search-filter-container">
+                <div class="search-filter">
+                    <input type="text" id="scanHistoryFilter" placeholder="Filter by domain...">
+                </div>
+                <div class="refresh-button-container">
+                    <button id="refreshButton" class="refresh-button"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
             </div>
             <table>
                 <thead>
