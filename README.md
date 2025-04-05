@@ -10,8 +10,10 @@ A Flask web application for finding subdomains and checking live hosts, based on
   - AlienVault OTX
 - Check which subdomains are live using httpx (with 100 threads)
 - Collect historical URLs using gau (with 50 threads)
+- Scan for open ports using naabu (top 100 ports)
 - Color-coded HTTP status codes (2xx green, 3xx blue, 4xx red)
 - On-demand GAU scanning via buttons next to each live host
+- On-demand port scanning via buttons next to each live host
 - Real-time progress updates with Server-Sent Events
 - Progress bar and live counters during scanning
 - Clean web interface to display results
@@ -26,6 +28,7 @@ A Flask web application for finding subdomains and checking live hosts, based on
   - [subfinder](https://github.com/projectdiscovery/subfinder)
   - [httpx](https://github.com/projectdiscovery/httpx)
   - [gau](https://github.com/lc/gau)
+  - [naabu](https://github.com/projectdiscovery/naabu)
 
 ## Installation
 
@@ -57,6 +60,11 @@ A Flask web application for finding subdomains and checking live hosts, based on
    GO111MODULE=on go get -v github.com/lc/gau
    ```
 
+   **naabu**:
+   ```
+   GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
+   ```
+
 ## Usage
 
 1. Start the Flask application:
@@ -85,6 +93,7 @@ A Flask web application for finding subdomains and checking live hosts, based on
   - Without subfinder: Only crt.sh will be used for subdomain enumeration
   - Without httpx: Live host checking will be skipped
   - Without gau: Historical URL collection will be skipped
+  - Without naabu: Port scanning will be skipped
 
 ## License
 

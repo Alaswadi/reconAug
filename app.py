@@ -65,7 +65,8 @@ def check_tools():
     tools = {
         'subfinder': False,
         'httpx': False,
-        'gau': False
+        'gau': False,
+        'naabu': False
     }
 
     try:
@@ -86,6 +87,13 @@ def check_tools():
         # Check gau
         subprocess.run(['gau', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         tools['gau'] = True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+
+    try:
+        # Check naabu
+        subprocess.run(['naabu', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        tools['naabu'] = True
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
 
@@ -285,6 +293,57 @@ def get_historical_urls(domain):
     except (FileNotFoundError, subprocess.SubprocessError) as e:
         return [], str(e)
 
+def check_ports(host):
+    """Check for open ports using naabu"""
+    output_file = f"output/naabu_{host}.txt"
+
+    try:
+        # Check if naabu is available
+        try:
+            subprocess.run(['naabu', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        except (FileNotFoundError, subprocess.SubprocessError):
+            return [], "Naabu tool is not installed"
+
+        # Run naabu command with common ports
+        print(f"Running port scan on {host}...")
+        process = subprocess.run(
+            ['naabu', '-host', host, '-top-ports', '100', '-silent'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True
+        )
+
+        # Parse the output directly from stdout
+        ports = []
+        if process.stdout:
+            for line in process.stdout.splitlines():
+                line = line.strip()
+                if line and ':' in line:
+                    # Format is typically host:port
+                    parts = line.split(':')
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        port = int(parts[1])
+                        ports.append(port)
+
+            # Save to file for reference
+            with open(output_file, 'w') as f:
+                for port in sorted(ports):
+                    f.write(f"{port}\n")
+
+        # If no ports found in stdout, try to read from the output file
+        if not ports and os.path.exists(output_file):
+            with open(output_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and line.isdigit():
+                        ports.append(int(line))
+
+        return sorted(ports), None
+    except Exception as e:
+        print(f"Error running naabu: {e}")
+        return [], str(e)
+
 @app.route('/')
 def index():
     tools = check_tools()
@@ -478,6 +537,31 @@ def run_gau():
         'domain': domain,
         'count': len(urls),
         'urls': urls
+    })
+
+@app.route('/scan-ports', methods=['GET'])
+def scan_ports():
+    host = request.args.get('host', '').strip()
+
+    if not host:
+        return jsonify({'error': 'Host is required'}), 400
+
+    print(f"Running port scan for {host}...")
+    # Run port scan for the specific host
+    ports, error = check_ports(host)
+
+    if error:
+        print(f"Error running port scan for {host}: {error}")
+        return jsonify({
+            'error': error,
+            'ports': []
+        }), 500
+
+    print(f"Found {len(ports)} open ports for {host}")
+    return jsonify({
+        'host': host,
+        'count': len(ports),
+        'ports': ports
     })
 
 if __name__ == '__main__':

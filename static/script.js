@@ -329,10 +329,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
             gauCell.appendChild(gauButton);
 
+            // Port scan button cell
+            const portCell = document.createElement('td');
+            const portButton = document.createElement('button');
+            portButton.textContent = 'Scan Ports';
+            portButton.classList.add('port-button');
+            portButton.dataset.host = domain;
+
+            // Check if port scan is already running or completed for this host
+            if (portScanLoading[domain]) {
+                portButton.disabled = true;
+                portButton.textContent = 'Scanning...';
+            } else if (portScanResults[domain]) {
+                portButton.textContent = 'View Ports';
+                portButton.classList.add('view-button');
+            }
+
+            portButton.addEventListener('click', function() {
+                const host = this.dataset.host;
+
+                if (portScanResults[host]) {
+                    // If we already have results, show them
+                    showPortScanResults(host);
+                } else {
+                    // Otherwise, run port scan
+                    scanPorts(host, this);
+                }
+            });
+
+            portCell.appendChild(portButton);
+
             row.appendChild(urlCell);
             row.appendChild(statusCell);
             row.appendChild(techCell);
             row.appendChild(gauCell);
+            row.appendChild(portCell);
 
             liveHostsTable.appendChild(row);
         });
@@ -411,6 +442,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Store port scan results
+    let portScanResults = {};
+    let portScanLoading = {};
+
     // Function to run GAU for a specific domain
     function runGau(domain, button) {
         // Update button state
@@ -447,6 +482,143 @@ document.addEventListener('DOMContentLoaded', function() {
             button.textContent = 'Run GAU (Failed)';
             gauLoading[domain] = false;
         });
+    }
+
+    // Function to scan ports for a specific host
+    function scanPorts(host, button) {
+        // Update button state
+        button.disabled = true;
+        button.textContent = 'Scanning...';
+        portScanLoading[host] = true;
+
+        // Make AJAX request to scan ports
+        fetch(`/scan-ports?host=${encodeURIComponent(host)}`, {
+            method: 'GET'
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Store the results
+            portScanResults[host] = data.ports || [];
+
+            // Update button
+            button.disabled = false;
+            button.textContent = 'View Ports';
+            button.classList.add('view-button');
+            portScanLoading[host] = false;
+
+            // Show a notification
+            alert(`Found ${data.ports.length} open ports on ${host}`);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            button.disabled = false;
+            button.textContent = 'Scan Ports (Failed)';
+            portScanLoading[host] = false;
+        });
+    }
+
+    // Function to show port scan results
+    function showPortScanResults(host) {
+        const ports = portScanResults[host] || [];
+
+        if (ports.length === 0) {
+            alert(`No open ports found on ${host}`);
+            return;
+        }
+
+        // Create a modal to display the results
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+
+        // Create close button
+        const closeButton = document.createElement('span');
+        closeButton.className = 'close-button';
+        closeButton.innerHTML = '&times;';
+        closeButton.onclick = function() {
+            document.body.removeChild(modal);
+        };
+
+        // Create header
+        const header = document.createElement('h2');
+        header.textContent = `Open Ports on ${host}`;
+
+        // Create port list
+        const portList = document.createElement('div');
+        portList.className = 'port-list';
+
+        // Group ports by common services
+        const commonPorts = {
+            '21': 'FTP',
+            '22': 'SSH',
+            '23': 'Telnet',
+            '25': 'SMTP',
+            '53': 'DNS',
+            '80': 'HTTP',
+            '110': 'POP3',
+            '143': 'IMAP',
+            '443': 'HTTPS',
+            '445': 'SMB',
+            '3306': 'MySQL',
+            '3389': 'RDP',
+            '5432': 'PostgreSQL',
+            '8080': 'HTTP-Proxy',
+            '8443': 'HTTPS-Alt'
+        };
+
+        // Create a table for the ports
+        const table = document.createElement('table');
+        table.className = 'port-table';
+
+        // Create table header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const portHeader = document.createElement('th');
+        portHeader.textContent = 'Port';
+        const serviceHeader = document.createElement('th');
+        serviceHeader.textContent = 'Possible Service';
+
+        headerRow.appendChild(portHeader);
+        headerRow.appendChild(serviceHeader);
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement('tbody');
+
+        ports.forEach(port => {
+            const row = document.createElement('tr');
+
+            const portCell = document.createElement('td');
+            portCell.textContent = port;
+
+            const serviceCell = document.createElement('td');
+            serviceCell.textContent = commonPorts[port] || 'Unknown';
+
+            row.appendChild(portCell);
+            row.appendChild(serviceCell);
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        portList.appendChild(table);
+
+        // Assemble modal
+        modalContent.appendChild(closeButton);
+        modalContent.appendChild(header);
+        modalContent.appendChild(portList);
+        modal.appendChild(modalContent);
+
+        // Add modal to body
+        document.body.appendChild(modal);
     }
 
     // Function to show historical URLs for a specific domain
