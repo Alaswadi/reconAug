@@ -279,32 +279,90 @@ a:hover {
     text-decoration: underline;
 }
 
+/* Status code colors */
+.status-2xx {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.status-3xx {
+    color: var(--secondary-color);
+    font-weight: bold;
+}
+
+.status-4xx {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.status-5xx {
+    color: var(--warning-color);
+    font-weight: bold;
+}
+
+/* GAU button styles */
+.gau-button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.gau-button:hover {
+    background-color: #0b7dda;
+}
+
+.gau-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.view-button {
+    background-color: var(--success-color);
+}
+
+.view-button:hover {
+    background-color: #45a049;
+}
+
+/* Domain header in historical URLs */
+.domain-header {
+    background-color: #f1f1f1;
+    font-weight: bold;
+    padding: 10px;
+    text-align: center;
+}
+
 @media (max-width: 768px) {
     .input-group {
         flex-direction: column;
     }
-    
+
     input[type="text"] {
         border-radius: 4px;
         margin-bottom: 10px;
     }
-    
+
     button {
         border-radius: 4px;
     }
-    
+
     .stats {
         flex-direction: column;
     }
-    
+
     .stat-box {
         margin: 5px 0;
     }
-    
+
     .tabs {
         flex-direction: column;
     }
-    
+
     th, td {
         padding: 8px;
     }

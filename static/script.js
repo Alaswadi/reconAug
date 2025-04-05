@@ -4,55 +4,58 @@ document.addEventListener('DOMContentLoaded', function() {
     const scanButton = document.getElementById('scanButton');
     const loadingDiv = document.getElementById('loading');
     const resultsDiv = document.getElementById('results');
-    
+
     // Results elements
     const resultDomain = document.getElementById('resultDomain');
     const subdomainsCount = document.getElementById('subdomainsCount');
     const liveHostsCount = document.getElementById('liveHostsCount');
     const historicalUrlsCount = document.getElementById('historicalUrlsCount');
-    
+
     // Tables
     const liveHostsTable = document.getElementById('liveHostsTable');
     const subdomainsTable = document.getElementById('subdomainsTable');
     const historicalUrlsTable = document.getElementById('historicalUrlsTable');
-    
+
     // Filters
     const liveHostsFilter = document.getElementById('liveHostsFilter');
     const subdomainsFilter = document.getElementById('subdomainsFilter');
     const historicalUrlsFilter = document.getElementById('historicalUrlsFilter');
-    
+
     // Tab buttons
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanes = document.querySelectorAll('.tab-pane');
-    
+
     // Store the full results for filtering
     let fullResults = {
         liveHosts: [],
         subdomains: [],
-        historicalUrls: []
+        historicalUrls: {}
     };
-    
+
+    // Track GAU loading status
+    let gauLoading = {};
+
     // Handle form submission
     scanForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const domain = document.getElementById('domain').value.trim();
-        
+
         if (!domain) {
             alert('Please enter a domain');
             return;
         }
-        
+
         // Show loading, hide results
         loadingDiv.classList.remove('hidden');
         resultsDiv.classList.add('hidden');
         scanButton.disabled = true;
         scanButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
-        
+
         // Send the request
         const formData = new FormData();
         formData.append('domain', domain);
-        
+
         fetch('/scan', {
             method: 'POST',
             body: formData
@@ -67,19 +70,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store the full results
             fullResults.liveHosts = data.live_hosts || [];
             fullResults.subdomains = data.subdomains || [];
-            fullResults.historicalUrls = data.historical_urls || [];
-            
+            fullResults.historicalUrls = {}; // Reset historical URLs
+
             // Update the UI
             resultDomain.textContent = data.domain;
             subdomainsCount.textContent = data.subdomains_count;
             liveHostsCount.textContent = data.live_hosts_count;
-            historicalUrlsCount.textContent = data.historical_urls_count;
-            
+            historicalUrlsCount.textContent = 0; // Reset to 0 since we're not running GAU automatically
+
             // Populate tables
             populateLiveHostsTable(fullResults.liveHosts);
             populateSubdomainsTable(fullResults.subdomains);
-            populateHistoricalUrlsTable(fullResults.historicalUrls);
-            
+            populateHistoricalUrlsTable([]);
+
             // Hide loading, show results
             loadingDiv.classList.add('hidden');
             resultsDiv.classList.remove('hidden');
@@ -94,90 +97,151 @@ document.addEventListener('DOMContentLoaded', function() {
             scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
         });
     });
-    
+
     // Tab switching
     tabButtons.forEach(button => {
         button.addEventListener('click', function() {
             // Remove active class from all buttons and panes
             tabButtons.forEach(btn => btn.classList.remove('active'));
             tabPanes.forEach(pane => pane.classList.remove('active'));
-            
+
             // Add active class to clicked button and corresponding pane
             this.classList.add('active');
             const tabId = this.getAttribute('data-tab');
             document.getElementById(tabId).classList.add('active');
         });
     });
-    
+
     // Filter functionality
     liveHostsFilter.addEventListener('input', function() {
         const filterValue = this.value.toLowerCase();
-        const filteredHosts = fullResults.liveHosts.filter(host => 
-            host.url.toLowerCase().includes(filterValue) || 
-            host.status_code.toLowerCase().includes(filterValue) || 
+        const filteredHosts = fullResults.liveHosts.filter(host =>
+            host.url.toLowerCase().includes(filterValue) ||
+            host.status_code.toLowerCase().includes(filterValue) ||
             host.technology.toLowerCase().includes(filterValue)
         );
         populateLiveHostsTable(filteredHosts);
     });
-    
+
     subdomainsFilter.addEventListener('input', function() {
         const filterValue = this.value.toLowerCase();
-        const filteredSubdomains = fullResults.subdomains.filter(subdomain => 
+        const filteredSubdomains = fullResults.subdomains.filter(subdomain =>
             subdomain.toLowerCase().includes(filterValue)
         );
         populateSubdomainsTable(filteredSubdomains);
     });
-    
+
     historicalUrlsFilter.addEventListener('input', function() {
         const filterValue = this.value.toLowerCase();
-        const filteredUrls = fullResults.historicalUrls.filter(url => 
-            url.toLowerCase().includes(filterValue)
-        );
-        populateHistoricalUrlsTable(filteredUrls);
+
+        // Check if we're viewing a specific domain's historical URLs
+        const domainHeader = document.querySelector('#historicalUrls .domain-header');
+        if (domainHeader) {
+            const domain = domainHeader.textContent.replace('Historical URLs for ', '');
+            if (fullResults.historicalUrls[domain]) {
+                const filteredUrls = fullResults.historicalUrls[domain].filter(url =>
+                    url.toLowerCase().includes(filterValue)
+                );
+                populateHistoricalUrlsTable(filteredUrls, domain);
+                return;
+            }
+        }
+
+        // If not viewing a specific domain, show empty results
+        populateHistoricalUrlsTable([]);
     });
-    
+
     // Helper functions to populate tables
     function populateLiveHostsTable(hosts) {
         liveHostsTable.innerHTML = '';
-        
+
         if (hosts.length === 0) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 3;
+            cell.colSpan = 4; // Updated to 4 columns
             cell.textContent = 'No live hosts found';
             cell.style.textAlign = 'center';
             row.appendChild(cell);
             liveHostsTable.appendChild(row);
             return;
         }
-        
+
         hosts.forEach(host => {
             const row = document.createElement('tr');
-            
+
+            // Extract domain from URL
+            let domain = new URL(host.url).hostname;
+
+            // URL cell
             const urlCell = document.createElement('td');
             const urlLink = document.createElement('a');
             urlLink.href = host.url;
             urlLink.textContent = host.url;
             urlLink.target = '_blank';
             urlCell.appendChild(urlLink);
-            
+
+            // Status code cell with color coding
             const statusCell = document.createElement('td');
             statusCell.textContent = host.status_code;
-            
+
+            // Apply color based on status code
+            const statusCode = parseInt(host.status_code);
+            if (statusCode >= 200 && statusCode < 300) {
+                statusCell.classList.add('status-2xx'); // Green
+            } else if (statusCode >= 300 && statusCode < 400) {
+                statusCell.classList.add('status-3xx'); // Blue
+            } else if (statusCode >= 400 && statusCode < 500) {
+                statusCell.classList.add('status-4xx'); // Red
+            } else if (statusCode >= 500) {
+                statusCell.classList.add('status-5xx'); // Orange
+            }
+
+            // Technology cell
             const techCell = document.createElement('td');
             techCell.textContent = host.technology;
-            
+
+            // GAU button cell
+            const gauCell = document.createElement('td');
+            const gauButton = document.createElement('button');
+            gauButton.textContent = 'Run GAU';
+            gauButton.classList.add('gau-button');
+            gauButton.dataset.domain = domain;
+
+            // Check if GAU is already running or completed for this domain
+            if (gauLoading[domain]) {
+                gauButton.disabled = true;
+                gauButton.textContent = 'Loading...';
+            } else if (fullResults.historicalUrls[domain]) {
+                gauButton.textContent = 'View URLs';
+                gauButton.classList.add('view-button');
+            }
+
+            gauButton.addEventListener('click', function() {
+                const domain = this.dataset.domain;
+
+                if (fullResults.historicalUrls[domain]) {
+                    // If we already have results, show them
+                    showHistoricalUrls(domain);
+                } else {
+                    // Otherwise, run GAU
+                    runGau(domain, this);
+                }
+            });
+
+            gauCell.appendChild(gauButton);
+
             row.appendChild(urlCell);
             row.appendChild(statusCell);
             row.appendChild(techCell);
-            
+            row.appendChild(gauCell);
+
             liveHostsTable.appendChild(row);
         });
     }
-    
+
     function populateSubdomainsTable(subdomains) {
         subdomainsTable.innerHTML = '';
-        
+
         if (subdomains.length === 0) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
@@ -187,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
             subdomainsTable.appendChild(row);
             return;
         }
-        
+
         subdomains.forEach(subdomain => {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
@@ -196,30 +260,106 @@ document.addEventListener('DOMContentLoaded', function() {
             subdomainsTable.appendChild(row);
         });
     }
-    
-    function populateHistoricalUrlsTable(urls) {
+
+    function populateHistoricalUrlsTable(urls, domain = null) {
         historicalUrlsTable.innerHTML = '';
-        
-        if (urls.length === 0) {
+
+        // Add domain header if provided
+        if (domain) {
+            const headerRow = document.createElement('tr');
+            const headerCell = document.createElement('td');
+            headerCell.colSpan = 2;
+            headerCell.classList.add('domain-header');
+            headerCell.textContent = `Historical URLs for ${domain}`;
+            headerRow.appendChild(headerCell);
+            historicalUrlsTable.appendChild(headerRow);
+        }
+
+        if (!urls || urls.length === 0) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
+            cell.colSpan = 2;
             cell.textContent = 'No historical URLs found';
             cell.style.textAlign = 'center';
             row.appendChild(cell);
             historicalUrlsTable.appendChild(row);
             return;
         }
-        
+
         urls.forEach(url => {
             const row = document.createElement('tr');
-            const cell = document.createElement('td');
+
+            // URL cell
+            const urlCell = document.createElement('td');
             const link = document.createElement('a');
             link.href = url;
             link.textContent = url;
             link.target = '_blank';
-            cell.appendChild(link);
-            row.appendChild(cell);
+            urlCell.appendChild(link);
+
+            // Path cell - show the path part of the URL
+            const pathCell = document.createElement('td');
+            try {
+                const urlObj = new URL(url);
+                pathCell.textContent = urlObj.pathname + urlObj.search;
+            } catch (e) {
+                pathCell.textContent = 'Invalid URL';
+            }
+
+            row.appendChild(urlCell);
+            row.appendChild(pathCell);
             historicalUrlsTable.appendChild(row);
         });
+    }
+
+    // Function to run GAU for a specific domain
+    function runGau(domain, button) {
+        // Update button state
+        button.disabled = true;
+        button.textContent = 'Loading...';
+        gauLoading[domain] = true;
+
+        // Make AJAX request to run GAU
+        fetch(`/run-gau?domain=${encodeURIComponent(domain)}`, {
+            method: 'GET'
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Store the results
+            fullResults.historicalUrls[domain] = data.urls || [];
+
+            // Update button
+            button.disabled = false;
+            button.textContent = 'View URLs';
+            button.classList.add('view-button');
+            gauLoading[domain] = false;
+
+            // Show a notification
+            alert(`Found ${data.urls.length} historical URLs for ${domain}`);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            button.disabled = false;
+            button.textContent = 'Run GAU (Failed)';
+            gauLoading[domain] = false;
+        });
+    }
+
+    // Function to show historical URLs for a specific domain
+    function showHistoricalUrls(domain) {
+        // Switch to historical URLs tab
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabPanes.forEach(pane => pane.classList.remove('active'));
+
+        document.querySelector('[data-tab="historicalUrls"]').classList.add('active');
+        document.getElementById('historicalUrls').classList.add('active');
+
+        // Populate the table with domain-specific results
+        populateHistoricalUrlsTable(fullResults.historicalUrls[domain], domain);
     }
 });

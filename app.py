@@ -148,19 +148,33 @@ def get_historical_urls(domain):
     output_file = f"output/gau_{domain}.txt"
 
     try:
-        subprocess.run(
-            ['gau', '--threads', '5', domain, '--o', output_file],
+        # Check if gau is available
+        tools = check_tools()
+        if not tools['gau']:
+            return [], "GAU tool is not installed"
+
+        # Run gau command
+        process = subprocess.run(
+            ['gau', '--threads', '5', domain],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            check=False
+            check=False,
+            text=True
         )
 
-        if os.path.exists(output_file):
-            with open(output_file, 'r') as f:
-                return [line.strip() for line in f if line.strip()]
-        return []
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return []
+        # Parse the output directly from stdout
+        urls = []
+        if process.stdout:
+            urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+
+            # Save to file for reference
+            with open(output_file, 'w') as f:
+                for url in urls:
+                    f.write(f"{url}\n")
+
+        return urls, None
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        return [], str(e)
 
 @app.route('/')
 def index():
@@ -200,20 +214,34 @@ def scan():
     # Check live hosts
     live_hosts = check_live_hosts(all_domains, domain)
 
-    # Get historical URLs (if gau is available)
-    tools = check_tools()
-    historical_urls = []
-    if tools['gau']:
-        historical_urls = get_historical_urls(domain)
-
     return jsonify({
         'domain': domain,
         'subdomains_count': len(all_domains),
         'live_hosts_count': len(live_hosts),
-        'historical_urls_count': len(historical_urls),
         'subdomains': all_domains,
-        'live_hosts': live_hosts,
-        'historical_urls': historical_urls[:100]  # Limit to 100 for performance
+        'live_hosts': live_hosts
+    })
+
+@app.route('/run-gau', methods=['GET'])
+def run_gau():
+    domain = request.args.get('domain', '').strip()
+
+    if not domain:
+        return jsonify({'error': 'Domain is required'}), 400
+
+    # Run GAU for the specific domain
+    urls, error = get_historical_urls(domain)
+
+    if error:
+        return jsonify({
+            'error': error,
+            'urls': []
+        }), 500
+
+    return jsonify({
+        'domain': domain,
+        'count': len(urls),
+        'urls': urls
     })
 
 if __name__ == '__main__':
