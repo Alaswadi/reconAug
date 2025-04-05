@@ -1,46 +1,44 @@
-FROM golang:1.20 AS go-builder
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y git build-essential libpcap-dev
-
-# Set up Go environment
-ENV GO111MODULE=on
-ENV CGO_ENABLED=1
-
-# Create a temporary directory for Go modules
-WORKDIR /go/src/tools
-
-# Install subfinder
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-
-# Install httpx
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-
-# Install gau
-RUN go install -v github.com/lc/gau/v2/cmd/gau@latest
-
-# Install naabu (requires CGO for pcap)
-RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-
 FROM python:3.9-slim
 
-# Copy Go binaries from go-builder
-COPY --from=go-builder /go/bin/subfinder /usr/local/bin/
-COPY --from=go-builder /go/bin/httpx /usr/local/bin/
-COPY --from=go-builder /go/bin/gau /usr/local/bin/
-COPY --from=go-builder /go/bin/naabu /usr/local/bin/
-
-# Install runtime dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
     nmap \
     libpcap-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create config directories for tools
-RUN mkdir -p /root/.config/subfinder \
-    && mkdir -p /root/.config/httpx \
-    && mkdir -p /root/.config/naabu
+# Create directories
+RUN mkdir -p /tools /app/output /root/.config/subfinder /root/.config/httpx /root/.config/naabu
+
+# Install subfinder
+RUN wget -q https://github.com/projectdiscovery/subfinder/releases/download/v2.6.3/subfinder_2.6.3_linux_amd64.zip -O /tmp/subfinder.zip \
+    && unzip /tmp/subfinder.zip -d /tmp \
+    && mv /tmp/subfinder /usr/local/bin/ \
+    && chmod +x /usr/local/bin/subfinder \
+    && rm /tmp/subfinder.zip
+
+# Install httpx
+RUN wget -q https://github.com/projectdiscovery/httpx/releases/download/v1.3.7/httpx_1.3.7_linux_amd64.zip -O /tmp/httpx.zip \
+    && unzip /tmp/httpx.zip -d /tmp \
+    && mv /tmp/httpx /usr/local/bin/ \
+    && chmod +x /usr/local/bin/httpx \
+    && rm /tmp/httpx.zip
+
+# Install naabu
+RUN wget -q https://github.com/projectdiscovery/naabu/releases/download/v2.1.8/naabu_2.1.8_linux_amd64.zip -O /tmp/naabu.zip \
+    && unzip /tmp/naabu.zip -d /tmp \
+    && mv /tmp/naabu /usr/local/bin/ \
+    && chmod +x /usr/local/bin/naabu \
+    && rm /tmp/naabu.zip
+
+# Install gau
+RUN wget -q https://github.com/lc/gau/releases/download/v2.1.2/gau_2.1.2_linux_amd64.tar.gz -O /tmp/gau.tar.gz \
+    && tar -xzf /tmp/gau.tar.gz -C /tmp \
+    && mv /tmp/gau /usr/local/bin/ \
+    && chmod +x /usr/local/bin/gau \
+    && rm /tmp/gau.tar.gz
 
 # Set working directory
 WORKDIR /app

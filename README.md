@@ -123,19 +123,14 @@ The Docker setup includes:
 - Volume mapping for persistent output storage
 - Exposed port 5001 for web access
 
-### Docker Build Options
+### Docker Build Approach
 
-This project includes two Dockerfile options:
+The Dockerfile uses pre-built binaries for all tools instead of compiling from source. This approach:
 
-1. **Default Dockerfile**: Compiles tools from source (may take longer to build)
-2. **Alternative Dockerfile**: Uses pre-built binaries (faster build, recommended if the default fails)
-
-To use the alternative Dockerfile, run:
-
-```
-chmod +x use_alt_dockerfile.sh
-./use_alt_dockerfile.sh
-```
+- Makes the build process faster and more reliable
+- Uses specific tested versions of each tool
+- Reduces the image size
+- Avoids compilation issues
 
 ### Docker Commands
 
