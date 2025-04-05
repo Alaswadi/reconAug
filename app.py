@@ -472,6 +472,34 @@ def debug_database():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug/clear-database')
+def clear_database():
+    """Debug endpoint to clear the database"""
+    try:
+        # Delete all records from all tables
+        HistoricalUrl.query.delete()
+        Port.query.delete()
+        LiveHost.query.delete()
+        Subdomain.query.delete()
+        Scan.query.delete()
+
+        # Commit the changes
+        db.session.commit()
+
+        # Add a test scan
+        add_test_scan()
+
+        return jsonify({
+            'message': 'Database cleared successfully',
+            'status': 'success'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
 def run_scan_in_background(task_id, domain):
     """Run the scan in a background thread and update progress"""
     try:
@@ -549,15 +577,20 @@ def run_scan_in_background(task_id, domain):
         try:
             print(f"Saving scan results to database for domain: {domain}")
             print(f"Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts")
-            scan_id = save_scan_to_database(domain, all_domains, live_hosts)
-            if scan_id:
-                print(f"Scan results saved successfully with ID: {scan_id}")
-                db_message = f'Scan complete. Results saved to database (ID: {scan_id}).'
-            else:
-                print("Failed to save scan results to database")
-                db_message = 'Scan complete. Note: Failed to save results to database.'
+
+            # Use application context for database operations
+            with app.app_context():
+                scan_id = save_scan_to_database(domain, all_domains, live_hosts)
+                if scan_id:
+                    print(f"Scan results saved successfully with ID: {scan_id}")
+                    db_message = f'Scan complete. Results saved to database (ID: {scan_id}).'
+                else:
+                    print("Failed to save scan results to database")
+                    db_message = 'Scan complete. Note: Failed to save results to database.'
         except Exception as db_error:
             print(f"Error saving to database: {db_error}")
+            import traceback
+            traceback.print_exc()
             db_message = 'Scan complete. Note: Failed to save results to database.'
 
         # Scan complete
@@ -678,21 +711,31 @@ def run_gau():
 
     # Try to find the most recent scan for this domain to associate the URLs with
     try:
-        scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
-        if scan:
-            # Check if we already have historical URLs for this scan
-            existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
-            if existing_urls == 0:
-                # Save historical URLs to database
-                for url in urls:
-                    db.session.add(HistoricalUrl(
-                        scan_id=scan.id,
-                        url=url
-                    ))
-                db.session.commit()
-                print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+        # Use application context for database operations
+        with app.app_context():
+            scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
+            if scan:
+                print(f"Found scan ID {scan.id} for domain {domain}")
+                # Check if we already have historical URLs for this scan
+                existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
+                if existing_urls == 0:
+                    print(f"No existing historical URLs for scan ID {scan.id}, saving {len(urls)} URLs")
+                    # Save historical URLs to database
+                    for url in urls:
+                        db.session.add(HistoricalUrl(
+                            scan_id=scan.id,
+                            url=url
+                        ))
+                    db.session.commit()
+                    print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+                else:
+                    print(f"Found {existing_urls} existing historical URLs for scan ID {scan.id}, skipping")
+            else:
+                print(f"No scan found for domain {domain}")
     except Exception as e:
         print(f"Error saving historical URLs to database: {e}")
+        import traceback
+        traceback.print_exc()
 
     return jsonify({
         'domain': domain,
@@ -722,11 +765,17 @@ def scan_ports():
 
     # Save port scan results to database
     try:
-        success = save_ports_to_database(host, ports)
-        if success:
-            print(f"Saved {len(ports)} ports to database for host {host}")
+        # Use application context for database operations
+        with app.app_context():
+            success = save_ports_to_database(host, ports)
+            if success:
+                print(f"Saved {len(ports)} ports to database for host {host}")
+            else:
+                print(f"Failed to save ports to database for host {host}")
     except Exception as e:
         print(f"Error saving ports to database: {e}")
+        import traceback
+        traceback.print_exc()
 
     return jsonify({
         'host': host,

@@ -46,6 +46,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Add clear database button functionality
+    const clearDatabaseButton = document.getElementById('clearDatabaseButton');
+    if (clearDatabaseButton) {
+        clearDatabaseButton.addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear the database? This will delete all scan history.')) {
+                console.log('Clearing database...');
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+                this.disabled = true;
+
+                fetch('/debug/clear-database')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Database cleared:', data);
+                        if (data.status === 'success') {
+                            alert('Database cleared successfully');
+                        } else {
+                            alert(`Error clearing database: ${data.error}`);
+                        }
+
+                        // Reload scan history
+                        loadScanHistory();
+
+                        // Re-enable button
+                        this.innerHTML = '<i class="fas fa-trash-alt"></i> Clear Database';
+                        this.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error clearing database:', error);
+                        alert(`Error clearing database: ${error.message}`);
+
+                        // Re-enable button
+                        this.innerHTML = '<i class="fas fa-trash-alt"></i> Clear Database';
+                        this.disabled = false;
+                    });
+            }
+        });
+    }
+
     // Close modal when clicking the close button
     document.querySelector('#scanDetailsModal .close-button').addEventListener('click', function() {
         scanDetailsModal.classList.add('hidden');

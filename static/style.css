@@ -300,6 +300,26 @@ button:hover {
     margin-right: 5px;
 }
 
+.clear-button {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    margin-left: 10px;
+}
+
+.clear-button:hover {
+    background-color: #c82333;
+}
+
+.clear-button i {
+    margin-right: 5px;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
