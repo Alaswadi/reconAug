@@ -693,10 +693,11 @@ def scan_ports():
         'ports': ports
     })
 
-# Create database tables before first request
-@app.before_first_request
+# Create a function to create database tables
 def create_tables():
-    db.create_all()
+    with app.app_context():
+        db.create_all()
+        print("Database tables created successfully")
 
 # Helper function to save scan results to database
 def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
@@ -857,7 +858,8 @@ def host_ports(host_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Create tables when the app starts
+create_tables()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create tables before running the app
     app.run(host='0.0.0.0', port=5001, debug=True)
