@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => console.error('Error polling GAU progress:', error));
         }, 1000);
 
-        // Make AJAX request to run GAU
+        // Make AJAX request to start GAU
         fetch(`/run-gau?domain=${encodeURIComponent(domain)}`, {
             method: 'GET'
         })
@@ -450,26 +450,92 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-            // Clear polling interval
-            clearInterval(pollInterval);
+            // If we got immediate results (cached)
+            if (data.urls) {
+                // Clear polling interval
+                clearInterval(pollInterval);
 
-            // Store the results
-            fullResults.historicalUrls[domain] = data.urls || [];
+                // Store the results
+                fullResults.historicalUrls[domain] = data.urls || [];
 
-            // Update button
-            button.disabled = false;
-            button.textContent = 'View URLs';
-            button.classList.add('view-button');
-            gauLoading[domain] = false;
+                // Update button
+                button.disabled = false;
+                button.textContent = 'View URLs';
+                button.classList.add('view-button');
+                gauLoading[domain] = false;
 
-            // Update progress indicator
-            progressIndicator.innerHTML = `<span>${data.urls.length} URLs found</span>`;
-            progressIndicator.classList.add('gau-complete');
+                // Update progress indicator
+                progressIndicator.innerHTML = `<span>${data.urls.length} URLs found</span>`;
+                progressIndicator.classList.add('gau-complete');
 
-            // Remove progress indicator after a delay
-            setTimeout(() => {
-                progressIndicator.remove();
-            }, 3000);
+                // Remove progress indicator after a delay
+                setTimeout(() => {
+                    progressIndicator.remove();
+                }, 3000);
+
+                return;
+            }
+
+            // Otherwise, we need to poll for results
+            console.log(`GAU scan started with task ID: ${data.task_id}`);
+
+            // Set up a separate interval to check for completion
+            let resultCheckInterval = setInterval(() => {
+                fetch(`/task/${data.task_id}`)
+                    .then(response => response.json())
+                    .then(taskData => {
+                        // Update progress indicator with current count
+                        if (taskData.urls_count !== undefined) {
+                            progressIndicator.innerHTML = `<span>${taskData.urls_count} URLs found</span>`;
+                        }
+
+                        // Check if task is complete
+                        if (taskData.complete && taskData.status === 'complete') {
+                            // Clear both intervals
+                            clearInterval(pollInterval);
+                            clearInterval(resultCheckInterval);
+
+                            // Store the results
+                            fullResults.historicalUrls[domain] = taskData.urls || [];
+
+                            // Update button
+                            button.disabled = false;
+                            button.textContent = 'View URLs';
+                            button.classList.add('view-button');
+                            gauLoading[domain] = false;
+
+                            // Update progress indicator
+                            progressIndicator.innerHTML = `<span>${taskData.urls_count} URLs found</span>`;
+                            progressIndicator.classList.add('gau-complete');
+
+                            // Remove progress indicator after a delay
+                            setTimeout(() => {
+                                progressIndicator.remove();
+                            }, 3000);
+                        } else if (taskData.status === 'error') {
+                            // Clear both intervals
+                            clearInterval(pollInterval);
+                            clearInterval(resultCheckInterval);
+
+                            // Update button
+                            button.disabled = false;
+                            button.textContent = 'Run GAU (Failed)';
+                            gauLoading[domain] = false;
+
+                            // Update progress indicator
+                            progressIndicator.innerHTML = `<span class="error">${taskData.message || 'Failed'}</span>`;
+                            progressIndicator.classList.add('gau-error');
+
+                            // Remove progress indicator after a delay
+                            setTimeout(() => {
+                                progressIndicator.remove();
+                            }, 3000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking GAU task status:', error);
+                    });
+            }, 2000); // Check every 2 seconds
         })
         .catch(error => {
             // Clear polling interval

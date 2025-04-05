@@ -513,9 +513,19 @@ def run_gau():
             'urls': existing_task['urls']
         })
 
-    # Create a new task
-    task_manager.create_task(domain)
-    task_manager.update_task(task_id, domain=domain, urls=[])
+    # Create a new task with the custom task_id
+    with task_manager.lock:
+        task_manager.tasks[task_id] = {
+            'domain': domain,
+            'status': 'starting',
+            'progress': 0,
+            'message': 'Initializing GAU scan...',
+            'urls': [],
+            'urls_count': 0,
+            'start_time': time.time(),
+            'last_update': time.time(),
+            'complete': False
+        }
 
     # Start GAU in a background thread
     threading.Thread(target=run_gau_in_background, args=(task_id, domain)).start()
