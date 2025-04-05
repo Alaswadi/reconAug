@@ -43,12 +43,18 @@ def check_tools():
     return tools
 
 def get_subdomains_subfinder(domain):
-    """Get subdomains using subfinder"""
+    """Get subdomains using subfinder with multithreading"""
     output_file = f"output/subfinder_{domain}.txt"
 
     try:
+        # Check if subfinder is available
+        tools = check_tools()
+        if not tools['subfinder']:
+            return []
+
+        # Run subfinder with increased threads (default is 10)
         subprocess.run(
-            ['subfinder', '-d', domain, '-o', output_file, '-silent'],
+            ['subfinder', '-d', domain, '-o', output_file, '-silent', '-t', '50'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True
@@ -58,15 +64,18 @@ def get_subdomains_subfinder(domain):
             with open(output_file, 'r') as f:
                 return [line.strip() for line in f if line.strip()]
         return []
-    except (FileNotFoundError, subprocess.SubprocessError):
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        print(f"Error running subfinder: {e}")
         return []
 
 def get_subdomains_crtsh(domain):
-    """Get subdomains from crt.sh"""
+    """Get subdomains from crt.sh and other sources"""
     output_file = f"output/crtsh_{domain}.txt"
     subdomains = []
 
     try:
+        # Get subdomains from crt.sh
+        print(f"Fetching subdomains from crt.sh for {domain}...")
         response = requests.get(f"https://crt.sh/?q=%.{domain}&output=json", timeout=30)
         if response.status_code == 200:
             data = response.json()
@@ -84,28 +93,62 @@ def get_subdomains_crtsh(domain):
                     d = d.strip()
                     if d.startswith('*.'):
                         d = d[2:]
-                    if d and '@' not in d:
+                    if d and '@' not in d and domain in d:
                         subdomains.append(d)
 
-            # Remove duplicates
-            subdomains = list(set(subdomains))
+        # Get subdomains from Alienvault OTX
+        print(f"Fetching subdomains from AlienVault OTX for {domain}...")
+        try:
+            otx_url = f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns"
+            otx_response = requests.get(otx_url, timeout=30)
+            if otx_response.status_code == 200:
+                otx_data = otx_response.json()
+                if 'passive_dns' in otx_data:
+                    for entry in otx_data['passive_dns']:
+                        if 'hostname' in entry and domain in entry['hostname']:
+                            subdomains.append(entry['hostname'])
+        except Exception as e:
+            print(f"Error fetching from AlienVault OTX: {e}")
 
-            # Save to file
-            with open(output_file, 'w') as f:
-                for subdomain in subdomains:
-                    f.write(f"{subdomain}\n")
+        # Get subdomains from SecurityTrails (if API key is available)
+        # Note: This requires an API key, so it's commented out by default
+        # try:
+        #     headers = {"APIKEY": "YOUR_API_KEY"}
+        #     st_url = f"https://api.securitytrails.com/v1/domain/{domain}/subdomains"
+        #     st_response = requests.get(st_url, headers=headers, timeout=30)
+        #     if st_response.status_code == 200:
+        #         st_data = st_response.json()
+        #         if 'subdomains' in st_data:
+        #             for subdomain in st_data['subdomains']:
+        #                 subdomains.append(f"{subdomain}.{domain}")
+        # except Exception as e:
+        #     print(f"Error fetching from SecurityTrails: {e}")
+
+        # Remove duplicates
+        subdomains = list(set(subdomains))
+        print(f"Found {len(subdomains)} subdomains from passive sources for {domain}")
+
+        # Save to file
+        with open(output_file, 'w') as f:
+            for subdomain in subdomains:
+                f.write(f"{subdomain}\n")
 
         return subdomains
     except Exception as e:
-        print(f"Error fetching from crt.sh: {e}")
+        print(f"Error in passive subdomain enumeration: {e}")
         return []
 
 def check_live_hosts(domains, domain):
-    """Check which domains are live using httpx"""
+    """Check which domains are live using httpx with multithreading"""
     output_file = f"output/httpx_{domain}.txt"
     results = []
 
     if not domains:
+        return results
+
+    # Check if httpx is available
+    tools = check_tools()
+    if not tools['httpx']:
         return results
 
     # Save domains to a temporary file
@@ -115,9 +158,10 @@ def check_live_hosts(domains, domain):
             f.write(f"{domain}\n")
 
     try:
-        # Run httpx with no-color option to avoid ANSI color codes
+        # Run httpx with increased threads (default is 50) and no-color option
         process = subprocess.run(
-            ['httpx', '-l', temp_file, '-silent', '-tech-detect', '-status-code', '-no-color', '-o', output_file],
+            ['httpx', '-l', temp_file, '-silent', '-tech-detect', '-status-code', '-no-color',
+             '-threads', '100', '-rate-limit', '150', '-o', output_file],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False
@@ -169,9 +213,9 @@ def get_historical_urls(domain):
         if not tools['gau']:
             return [], "GAU tool is not installed"
 
-        # Run gau command
+        # Run gau command with increased threads
         process = subprocess.run(
-            ['gau', '--threads', '5', domain],
+            ['gau', '--threads', '50', domain],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
@@ -211,8 +255,9 @@ def scan():
         if os.path.exists(file_pattern):
             os.remove(file_pattern)
 
-    # Run tools in parallel
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Run subdomain discovery tools in parallel
+    print(f"Starting subdomain discovery for {domain}...")
+    with ThreadPoolExecutor(max_workers=2) as executor:
         subfinder_future = executor.submit(get_subdomains_subfinder, domain)
         crtsh_future = executor.submit(get_subdomains_crtsh, domain)
 
@@ -221,14 +266,20 @@ def scan():
 
     # Combine and deduplicate results
     all_domains = list(set(subfinder_results + crtsh_results))
+    print(f"Found {len(all_domains)} unique subdomains for {domain}")
 
     # Save combined domains
     with open(f"output/domain_{domain}.txt", 'w') as f:
         for d in all_domains:
             f.write(f"{d}\n")
 
-    # Check live hosts
-    live_hosts = check_live_hosts(all_domains, domain)
+    # Check live hosts in a separate thread
+    print(f"Checking live hosts for {domain}...")
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        live_hosts_future = executor.submit(check_live_hosts, all_domains, domain)
+        live_hosts = live_hosts_future.result()
+
+    print(f"Found {len(live_hosts)} live hosts for {domain}")
 
     return jsonify({
         'domain': domain,
@@ -245,15 +296,18 @@ def run_gau():
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
 
+    print(f"Running GAU for {domain}...")
     # Run GAU for the specific domain
     urls, error = get_historical_urls(domain)
 
     if error:
+        print(f"Error running GAU for {domain}: {error}")
         return jsonify({
             'error': error,
             'urls': []
         }), 500
 
+    print(f"Found {len(urls)} historical URLs for {domain}")
     return jsonify({
         'domain': domain,
         'count': len(urls),

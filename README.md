@@ -1,12 +1,17 @@
 # Subdomain Finder Web Application
 
-A Flask web application for finding subdomains and checking live hosts, based on the functionality of the original bash script.
+A Flask web application for finding subdomains and checking live hosts, based on the functionality of the original bash script. This version includes multithreading optimizations for faster scanning.
 
 ## Features
 
-- Find subdomains using subfinder and crt.sh
-- Check which subdomains are live using httpx
-- Collect historical URLs using gau
+- Find subdomains using multiple sources:
+  - subfinder (with 50 threads)
+  - crt.sh
+  - AlienVault OTX
+- Check which subdomains are live using httpx (with 100 threads)
+- Collect historical URLs using gau (with 50 threads)
+- Color-coded HTTP status codes (2xx green, 3xx blue, 4xx red)
+- On-demand GAU scanning via buttons next to each live host
 - Clean web interface to display results
 - Filter and search through results
 
