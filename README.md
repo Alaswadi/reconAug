@@ -32,6 +32,26 @@ A Flask web application for finding subdomains and checking live hosts, based on
 
 ## Installation
 
+### Option 1: Using Docker (Recommended)
+
+1. Clone this repository:
+   ```
+   git clone https://github.com/yourusername/subdomain-finder.git
+   cd subdomain-finder
+   ```
+
+2. Build and run with Docker Compose:
+   ```
+   docker-compose up -d
+   ```
+
+3. Access the application at:
+   ```
+   http://localhost:5001
+   ```
+
+### Option 2: Manual Installation
+
 1. Clone this repository:
    ```
    git clone https://github.com/yourusername/subdomain-finder.git
@@ -43,7 +63,7 @@ A Flask web application for finding subdomains and checking live hosts, based on
    pip install -r requirements.txt
    ```
 
-3. Install external tools (optional but recommended):
+3. Install external tools (required for full functionality):
 
    **subfinder**:
    ```
@@ -67,14 +87,14 @@ A Flask web application for finding subdomains and checking live hosts, based on
 
 ## Usage
 
-1. Start the Flask application:
+1. If using manual installation, start the Flask application:
    ```
    python app.py
    ```
 
 2. Open your web browser and navigate to:
    ```
-   http://127.0.0.1:5001
+   http://localhost:5001
    ```
 
    The application is also accessible from other devices on your network using your computer's IP address:
@@ -94,6 +114,41 @@ A Flask web application for finding subdomains and checking live hosts, based on
   - Without httpx: Live host checking will be skipped
   - Without gau: Historical URL collection will be skipped
   - Without naabu: Port scanning will be skipped
+
+## Docker
+
+The Docker setup includes:
+
+- All required tools pre-installed (subfinder, httpx, gau, naabu)
+- Volume mapping for persistent output storage
+- Exposed port 5001 for web access
+
+### Docker Commands
+
+**Build the Docker image:**
+```
+docker build -t reconaug .
+```
+
+**Run the container:**
+```
+docker run -d -p 5001:5001 -v $(pwd)/output:/app/output --name reconaug reconaug
+```
+
+**Stop the container:**
+```
+docker stop reconaug
+```
+
+**Remove the container:**
+```
+docker rm reconaug
+```
+
+**View logs:**
+```
+docker logs -f reconaug
+```
 
 ## License
 

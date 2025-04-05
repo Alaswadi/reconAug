@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  reconaug:
+    build: .
+    container_name: reconaug
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./output:/app/output
+    restart: unless-stopped
