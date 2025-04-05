@@ -123,14 +123,33 @@ The Docker setup includes:
 - Volume mapping for persistent output storage
 - Exposed port 5001 for web access
 
+### Docker Build Options
+
+This project includes two Dockerfile options:
+
+1. **Default Dockerfile**: Compiles tools from source (may take longer to build)
+2. **Alternative Dockerfile**: Uses pre-built binaries (faster build, recommended if the default fails)
+
+To use the alternative Dockerfile, run:
+
+```
+chmod +x use_alt_dockerfile.sh
+./use_alt_dockerfile.sh
+```
+
 ### Docker Commands
 
-**Build the Docker image:**
+**Build and run with Docker Compose (recommended):**
+```
+docker-compose up -d
+```
+
+**Build the Docker image manually:**
 ```
 docker build -t reconaug .
 ```
 
-**Run the container:**
+**Run the container manually:**
 ```
 docker run -d -p 5001:5001 -v $(pwd)/output:/app/output --name reconaug reconaug
 ```
@@ -148,6 +167,11 @@ docker rm reconaug
 **View logs:**
 ```
 docker logs -f reconaug
+```
+
+**Rebuild the container (after changes):**
+```
+docker-compose up -d --build
 ```
 
 ## License
