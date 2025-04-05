@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import requests
+import re
 from flask import Flask, render_template, request, jsonify
 from concurrent.futures import ThreadPoolExecutor
 
@@ -114,9 +115,9 @@ def check_live_hosts(domains, domain):
             f.write(f"{domain}\n")
 
     try:
-        # Run httpx
+        # Run httpx with no-color option to avoid ANSI color codes
         process = subprocess.run(
-            ['httpx', '-l', temp_file, '-silent', '-tech-detect', '-status-code', '-o', output_file],
+            ['httpx', '-l', temp_file, '-silent', '-tech-detect', '-status-code', '-no-color', '-o', output_file],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False
@@ -131,8 +132,23 @@ def check_live_hosts(domains, domain):
                         parts = line.split(' [')
                         if len(parts) >= 3:
                             url = parts[0]
+                            # Remove ANSI color codes from status code
                             status_code = parts[1].rstrip(']')
+                            status_code = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', status_code)
+                            status_code = re.sub(r'\[\d+m', '', status_code).strip()
+
+                            # Try to convert to integer for proper comparison in frontend
+                            try:
+                                int(status_code)
+                            except ValueError:
+                                # If it's not a valid integer, extract digits
+                                status_code = re.sub(r'\D', '', status_code) or '0'
+
+                            # Remove ANSI color codes from technology
                             tech = parts[2].rstrip(']')
+                            tech = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', tech)
+                            tech = re.sub(r'\[\d+m', '', tech).strip()
+
                             results.append({
                                 'url': url,
                                 'status_code': status_code,

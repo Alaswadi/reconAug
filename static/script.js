@@ -185,7 +185,13 @@ document.addEventListener('DOMContentLoaded', function() {
             statusCell.textContent = host.status_code;
 
             // Apply color based on status code
-            const statusCode = parseInt(host.status_code);
+            let statusCode;
+            try {
+                statusCode = parseInt(host.status_code);
+            } catch (e) {
+                statusCode = 0;
+            }
+
             if (statusCode >= 200 && statusCode < 300) {
                 statusCell.classList.add('status-2xx'); // Green
             } else if (statusCode >= 300 && statusCode < 400) {
