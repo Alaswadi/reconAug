@@ -60,13 +60,17 @@ class TaskManager:
 # Initialize task manager
 task_manager = TaskManager()
 
+# Chaos API key for ProjectDiscovery
+CHAOS_API_KEY = "47a628d5-3721-4ae6-8369-a1111e509cfb"
+
 def check_tools():
     """Check if required tools are installed"""
     tools = {
         'subfinder': False,
         'httpx': False,
         'gau': False,
-        'naabu': False
+        'naabu': False,
+        'chaos_api': CHAOS_API_KEY != ""
     }
 
     try:
@@ -125,6 +129,36 @@ def get_subdomains_subfinder(domain):
         print(f"Error running subfinder: {e}")
         return []
 
+def get_subdomains_from_chaos(domain):
+    """Get subdomains from ProjectDiscovery's Chaos API"""
+    subdomains = []
+
+    if not CHAOS_API_KEY:
+        print("Chaos API key not available. Skipping Chaos API.")
+        return subdomains
+
+    try:
+        print(f"Fetching subdomains from Chaos API for {domain}...")
+        headers = {"Authorization": CHAOS_API_KEY}
+        chaos_url = f"https://dns.projectdiscovery.io/dns/{domain}/subdomains"
+
+        response = requests.get(chaos_url, headers=headers, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            if 'subdomains' in data:
+                for subdomain in data['subdomains']:
+                    full_domain = f"{subdomain}.{domain}"
+                    subdomains.append(full_domain)
+                print(f"Found {len(subdomains)} subdomains from Chaos API")
+            else:
+                print("No subdomains found in Chaos API response")
+        else:
+            print(f"Error fetching from Chaos API: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Error fetching from Chaos API: {e}")
+
+    return subdomains
+
 def get_subdomains_crtsh(domain):
     """Get subdomains from crt.sh and other sources"""
     output_file = f"output/crtsh_{domain}.txt"
@@ -167,19 +201,9 @@ def get_subdomains_crtsh(domain):
         except Exception as e:
             print(f"Error fetching from AlienVault OTX: {e}")
 
-        # Get subdomains from SecurityTrails (if API key is available)
-        # Note: This requires an API key, so it's commented out by default
-        # try:
-        #     headers = {"APIKEY": "YOUR_API_KEY"}
-        #     st_url = f"https://api.securitytrails.com/v1/domain/{domain}/subdomains"
-        #     st_response = requests.get(st_url, headers=headers, timeout=30)
-        #     if st_response.status_code == 200:
-        #         st_data = st_response.json()
-        #         if 'subdomains' in st_data:
-        #             for subdomain in st_data['subdomains']:
-        #                 subdomains.append(f"{subdomain}.{domain}")
-        # except Exception as e:
-        #     print(f"Error fetching from SecurityTrails: {e}")
+        # Get subdomains from Chaos API
+        chaos_subdomains = get_subdomains_from_chaos(domain)
+        subdomains.extend(chaos_subdomains)
 
         # Remove duplicates
         subdomains = list(set(subdomains))

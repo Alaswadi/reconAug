@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y \
 # Create directories
 RUN mkdir -p /tools /app/output /root/.config/subfinder /root/.config/httpx /root/.config/naabu
 
+# Set up Chaos API key for subfinder
+RUN mkdir -p /root/.config/subfinder
+RUN echo '{"chaos_api_key": "47a628d5-3721-4ae6-8369-a1111e509cfb"}' > /root/.config/subfinder/config.yaml
+
 # Install subfinder
 RUN wget -q https://github.com/projectdiscovery/subfinder/releases/download/v2.6.3/subfinder_2.6.3_linux_amd64.zip -O /tmp/subfinder.zip \
     && unzip /tmp/subfinder.zip -d /tmp \
