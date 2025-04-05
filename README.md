@@ -6,6 +6,7 @@ A Flask web application for finding subdomains and checking live hosts, based on
 
 - Find subdomains using multiple sources:
   - subfinder (with 50 threads)
+  - Sublist3r
   - ProjectDiscovery Chaos API
   - crt.sh
   - AlienVault OTX

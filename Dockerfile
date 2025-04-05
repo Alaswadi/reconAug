@@ -7,7 +7,14 @@ RUN apt-get update && apt-get install -y \
     nmap \
     libpcap-dev \
     ca-certificates \
+    git \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Sublist3r
+RUN git clone https://github.com/aboul3la/Sublist3r.git /tools/Sublist3r \
+    && cd /tools/Sublist3r \
+    && pip install -r requirements.txt
 
 # Create directories
 RUN mkdir -p /tools /app/output /root/.config/subfinder /root/.config/httpx /root/.config/naabu

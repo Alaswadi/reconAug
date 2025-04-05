@@ -70,7 +70,8 @@ def check_tools():
         'httpx': False,
         'gau': False,
         'naabu': False,
-        'chaos_api': CHAOS_API_KEY != ""
+        'chaos_api': CHAOS_API_KEY != "",
+        'sublist3r': False
     }
 
     try:
@@ -101,7 +102,61 @@ def check_tools():
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
 
+    # Check Sublist3r
+    try:
+        # Check if Sublist3r directory exists
+        if os.path.exists('/tools/Sublist3r/sublist3r.py'):
+            tools['sublist3r'] = True
+        else:
+            # Try to run Sublist3r as a command
+            subprocess.run(['sublist3r', '--help'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            tools['sublist3r'] = True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+
     return tools
+
+def get_subdomains_sublist3r(domain):
+    """Get subdomains using Sublist3r"""
+    output_file = f"output/sublist3r_{domain}.txt"
+
+    try:
+        # Check if Sublist3r is available
+        tools = check_tools()
+        if not tools['sublist3r']:
+            print("Sublist3r is not available. Skipping Sublist3r.")
+            return []
+
+        print(f"Running Sublist3r for {domain}...")
+
+        # Check if Sublist3r is installed in /tools directory
+        if os.path.exists('/tools/Sublist3r/sublist3r.py'):
+            # Run Sublist3r from the installed directory
+            subprocess.run(
+                ['python3', '/tools/Sublist3r/sublist3r.py', '-d', domain, '-o', output_file, '-v'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False
+            )
+        else:
+            # Run Sublist3r as a command
+            subprocess.run(
+                ['sublist3r', '-d', domain, '-o', output_file, '-v'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False
+            )
+
+        # Read the output file
+        if os.path.exists(output_file):
+            with open(output_file, 'r') as f:
+                subdomains = [line.strip() for line in f if line.strip()]
+            print(f"Found {len(subdomains)} subdomains with Sublist3r")
+            return subdomains
+        return []
+    except Exception as e:
+        print(f"Error running Sublist3r: {e}")
+        return []
 
 def get_subdomains_subfinder(domain):
     """Get subdomains using subfinder with multithreading"""
@@ -381,27 +436,31 @@ def run_scan_in_background(task_id, domain):
         # Clean up any existing output files
         for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",
                             f"output/domain_{domain}.txt", f"output/httpx_{domain}.txt",
-                            f"output/gau_{domain}.txt"]:
+                            f"output/gau_{domain}.txt", f"output/sublist3r_{domain}.txt"]:
             if os.path.exists(file_pattern):
                 os.remove(file_pattern)
 
         # Run subdomain discovery tools in parallel
-        task_manager.update_task(task_id, progress=10, message='Running subfinder...')
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        task_manager.update_task(task_id, progress=10, message='Running subfinder and Sublist3r...')
+        with ThreadPoolExecutor(max_workers=3) as executor:
             subfinder_future = executor.submit(get_subdomains_subfinder, domain)
+            sublist3r_future = executor.submit(get_subdomains_sublist3r, domain)
 
-            # Update progress while subfinder is running
+            # Update progress while other tools are running
             task_manager.update_task(task_id, progress=15, message='Running crt.sh and other passive sources...')
             crtsh_future = executor.submit(get_subdomains_crtsh, domain)
 
             subfinder_results = subfinder_future.result()
-            task_manager.update_task(task_id, progress=30, message=f'Found {len(subfinder_results)} subdomains with subfinder')
+            task_manager.update_task(task_id, progress=25, message=f'Found {len(subfinder_results)} subdomains with subfinder')
+
+            sublist3r_results = sublist3r_future.result()
+            task_manager.update_task(task_id, progress=30, message=f'Found {len(sublist3r_results)} subdomains with Sublist3r')
 
             crtsh_results = crtsh_future.result()
             task_manager.update_task(task_id, progress=40, message=f'Found {len(crtsh_results)} subdomains with passive sources')
 
         # Combine and deduplicate results
-        all_domains = list(set(subfinder_results + crtsh_results))
+        all_domains = list(set(subfinder_results + sublist3r_results + crtsh_results))
         task_manager.update_task(
             task_id,
             progress=50,
