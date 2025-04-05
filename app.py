@@ -346,8 +346,7 @@ def check_ports(host):
 
 @app.route('/')
 def index():
-    tools = check_tools()
-    return render_template('index.html', tools=tools)
+    return render_template('index.html')
 
 def run_scan_in_background(task_id, domain):
     """Run the scan in a background thread and update progress"""

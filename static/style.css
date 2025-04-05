@@ -42,58 +42,6 @@ header h1 {
     margin-bottom: 10px;
 }
 
-.tool-status {
-    background-color: white;
-    padding: 20px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-}
-
-.tool-status h3 {
-    margin-bottom: 15px;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
-}
-
-.tool-status ul {
-    list-style: none;
-}
-
-.tool-status li {
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-}
-
-.tool-name {
-    font-weight: bold;
-    width: 100px;
-    display: inline-block;
-}
-
-.status {
-    padding: 5px 10px;
-    border-radius: 3px;
-    margin-left: 10px;
-}
-
-.available {
-    color: var(--success-color);
-}
-
-.unavailable {
-    color: var(--danger-color);
-}
-
-.warning {
-    margin-top: 15px;
-    padding: 10px;
-    background-color: #fff3cd;
-    border-left: 4px solid var(--warning-color);
-    color: #856404;
-}
-
 .search-form {
     background-color: white;
     padding: 20px;
