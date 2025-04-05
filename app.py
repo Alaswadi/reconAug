@@ -455,44 +455,6 @@ def task_events(task_id):
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
-def run_gau_in_background(task_id, domain):
-    """Run GAU in a background thread and update progress"""
-    try:
-        # Initialize task
-        task_manager.update_task(task_id, status='running', message=f'Running GAU for {domain}...', urls_count=0)
-
-        # Run GAU for the specific domain
-        urls, error = get_historical_urls(domain)
-
-        if error:
-            print(f"Error running GAU for {domain}: {error}")
-            task_manager.update_task(
-                task_id,
-                status='error',
-                message=f'Error running GAU: {error}',
-                complete=True
-            )
-            return
-
-        # Update task with results
-        print(f"Found {len(urls)} historical URLs for {domain}")
-        task_manager.update_task(
-            task_id,
-            status='complete',
-            message=f'Found {len(urls)} historical URLs',
-            urls=urls,
-            urls_count=len(urls),
-            complete=True
-        )
-    except Exception as e:
-        print(f"Error in background GAU: {e}")
-        task_manager.update_task(
-            task_id,
-            status='error',
-            message=f'Error: {str(e)}',
-            complete=True
-        )
-
 @app.route('/run-gau', methods=['GET'])
 def run_gau():
     domain = request.args.get('domain', '').strip()
@@ -500,41 +462,22 @@ def run_gau():
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
 
-    # Create a task ID for this GAU run
-    task_id = f"gau-{domain}"
+    print(f"Running GAU for {domain}...")
+    # Run GAU for the specific domain
+    urls, error = get_historical_urls(domain)
 
-    # Check if there's already a completed task for this domain
-    existing_task = task_manager.get_task(task_id)
-    if existing_task and existing_task['complete'] and existing_task['status'] == 'complete':
-        # Return cached results
+    if error:
+        print(f"Error running GAU for {domain}: {error}")
         return jsonify({
-            'domain': domain,
-            'count': existing_task['urls_count'],
-            'urls': existing_task['urls']
-        })
+            'error': error,
+            'urls': []
+        }), 500
 
-    # Create a new task with the custom task_id
-    with task_manager.lock:
-        task_manager.tasks[task_id] = {
-            'domain': domain,
-            'status': 'starting',
-            'progress': 0,
-            'message': 'Initializing GAU scan...',
-            'urls': [],
-            'urls_count': 0,
-            'start_time': time.time(),
-            'last_update': time.time(),
-            'complete': False
-        }
-
-    # Start GAU in a background thread
-    threading.Thread(target=run_gau_in_background, args=(task_id, domain)).start()
-
-    # Return immediately with a task ID
+    print(f"Found {len(urls)} historical URLs for {domain}")
     return jsonify({
-        'task_id': task_id,
         'domain': domain,
-        'status': 'started'
+        'count': len(urls),
+        'urls': urls
     })
 
 if __name__ == '__main__':

@@ -370,29 +370,7 @@ a:hover {
     background-color: #45a049;
 }
 
-/* GAU progress indicator */
-.gau-progress {
-    margin-top: 5px;
-    font-size: 12px;
-    color: #666;
-    animation: pulse 1.5s infinite;
-}
 
-.gau-complete {
-    color: var(--success-color);
-    animation: none;
-}
-
-.gau-error {
-    color: var(--danger-color);
-    animation: none;
-}
-
-@keyframes pulse {
-    0% { opacity: 0.6; }
-    50% { opacity: 1; }
-    100% { opacity: 0.6; }
-}
 
 /* Domain header in historical URLs */
 .domain-header {
