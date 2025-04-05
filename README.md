@@ -1,0 +1,84 @@
+# Subdomain Finder Web Application
+
+A Flask web application for finding subdomains and checking live hosts, based on the functionality of the original bash script.
+
+## Features
+
+- Find subdomains using subfinder and crt.sh
+- Check which subdomains are live using httpx
+- Collect historical URLs using gau
+- Clean web interface to display results
+- Filter and search through results
+
+## Requirements
+
+- Python 3.7+
+- Flask
+- Requests
+- External tools (optional but recommended):
+  - [subfinder](https://github.com/projectdiscovery/subfinder)
+  - [httpx](https://github.com/projectdiscovery/httpx)
+  - [gau](https://github.com/lc/gau)
+
+## Installation
+
+1. Clone this repository:
+   ```
+   git clone https://github.com/yourusername/subdomain-finder.git
+   cd subdomain-finder
+   ```
+
+2. Install Python dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+3. Install external tools (optional but recommended):
+
+   **subfinder**:
+   ```
+   GO111MODULE=on go get -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
+   ```
+
+   **httpx**:
+   ```
+   GO111MODULE=on go get -v github.com/projectdiscovery/httpx/cmd/httpx
+   ```
+
+   **gau**:
+   ```
+   GO111MODULE=on go get -v github.com/lc/gau
+   ```
+
+## Usage
+
+1. Start the Flask application:
+   ```
+   python app.py
+   ```
+
+2. Open your web browser and navigate to:
+   ```
+   http://127.0.0.1:5001
+   ```
+
+   The application is also accessible from other devices on your network using your computer's IP address:
+   ```
+   http://YOUR_IP_ADDRESS:5001
+   ```
+
+3. Enter a domain name (e.g., example.com) and click "Scan"
+
+4. View the results in the web interface
+
+## Notes
+
+- The application will check if the required external tools are installed
+- If tools are missing, the application will still work but with limited functionality:
+  - Without subfinder: Only crt.sh will be used for subdomain enumeration
+  - Without httpx: Live host checking will be skipped
+  - Without gau: Historical URL collection will be skipped
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
