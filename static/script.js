@@ -35,6 +35,109 @@ document.addEventListener('DOMContentLoaded', function() {
     // Track GAU loading status
     let gauLoading = {};
 
+    // Progress bar elements
+    const progressBar = document.getElementById('progressBar');
+    const progressMessage = document.getElementById('progressMessage');
+    const progressSubdomains = document.getElementById('progressSubdomains');
+    const progressLiveHosts = document.getElementById('progressLiveHosts');
+
+    // Current task ID
+    let currentTaskId = null;
+    let eventSource = null;
+
+    // Function to update the progress UI
+    function updateProgress(data) {
+        progressBar.style.width = `${data.progress}%`;
+        progressMessage.textContent = data.message;
+        progressSubdomains.textContent = data.subdomains_count;
+        progressLiveHosts.textContent = data.live_hosts_count;
+
+        // If the task is complete, fetch the full results
+        if (data.status === 'complete') {
+            fetchTaskResults(currentTaskId);
+        } else if (data.status === 'error') {
+            alert(`Error: ${data.message}`);
+            loadingDiv.classList.add('hidden');
+            scanButton.disabled = false;
+            scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+    }
+
+    // Function to fetch the full task results
+    function fetchTaskResults(taskId) {
+        fetch(`/task/${taskId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Store the full results
+                fullResults.liveHosts = data.live_hosts || [];
+                fullResults.subdomains = data.subdomains || [];
+                fullResults.historicalUrls = {}; // Reset historical URLs
+
+                // Update the UI
+                resultDomain.textContent = data.domain;
+                subdomainsCount.textContent = data.subdomains_count;
+                liveHostsCount.textContent = data.live_hosts_count;
+                historicalUrlsCount.textContent = 0; // Reset to 0 since we're not running GAU automatically
+
+                // Populate tables
+                populateLiveHostsTable(fullResults.liveHosts);
+                populateSubdomainsTable(fullResults.subdomains);
+                populateHistoricalUrlsTable([]);
+
+                // Hide loading, show results
+                loadingDiv.classList.add('hidden');
+                resultsDiv.classList.remove('hidden');
+                scanButton.disabled = false;
+                scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
+
+                // Close the event source
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching results:', error);
+                alert('An error occurred while fetching results. Please try again.');
+                loadingDiv.classList.add('hidden');
+                scanButton.disabled = false;
+                scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
+            });
+    }
+
+    // Function to start listening for task updates
+    function listenForTaskUpdates(taskId) {
+        // Close any existing event source
+        if (eventSource) {
+            eventSource.close();
+        }
+
+        // Create a new event source
+        eventSource = new EventSource(`/task/${taskId}/events`);
+
+        // Listen for messages
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateProgress(data);
+        };
+
+        // Handle errors
+        eventSource.onerror = function() {
+            console.error('EventSource failed');
+            eventSource.close();
+            eventSource = null;
+        };
+    }
+
     // Handle form submission
     scanForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -45,6 +148,12 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter a domain');
             return;
         }
+
+        // Reset progress UI
+        progressBar.style.width = '0%';
+        progressMessage.textContent = 'Starting scan...';
+        progressSubdomains.textContent = '0';
+        progressLiveHosts.textContent = '0';
 
         // Show loading, hide results
         loadingDiv.classList.remove('hidden');
@@ -67,31 +176,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-            // Store the full results
-            fullResults.liveHosts = data.live_hosts || [];
-            fullResults.subdomains = data.subdomains || [];
-            fullResults.historicalUrls = {}; // Reset historical URLs
+            // Store the task ID
+            currentTaskId = data.task_id;
 
-            // Update the UI
-            resultDomain.textContent = data.domain;
-            subdomainsCount.textContent = data.subdomains_count;
-            liveHostsCount.textContent = data.live_hosts_count;
-            historicalUrlsCount.textContent = 0; // Reset to 0 since we're not running GAU automatically
-
-            // Populate tables
-            populateLiveHostsTable(fullResults.liveHosts);
-            populateSubdomainsTable(fullResults.subdomains);
-            populateHistoricalUrlsTable([]);
-
-            // Hide loading, show results
-            loadingDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            scanButton.disabled = false;
-            scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
+            // Start listening for updates
+            listenForTaskUpdates(currentTaskId);
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while scanning. Please try again.');
+            alert('An error occurred while starting the scan. Please try again.');
             loadingDiv.classList.add('hidden');
             scanButton.disabled = false;
             scanButton.innerHTML = '<i class="fas fa-search"></i> Scan';
@@ -325,6 +418,27 @@ document.addEventListener('DOMContentLoaded', function() {
         button.textContent = 'Loading...';
         gauLoading[domain] = true;
 
+        // Create a progress indicator next to the button
+        const parentCell = button.parentElement;
+        const progressIndicator = document.createElement('div');
+        progressIndicator.className = 'gau-progress';
+        progressIndicator.innerHTML = '<span>0 URLs found</span>';
+        parentCell.appendChild(progressIndicator);
+
+        // Set up polling for progress updates
+        let pollInterval = setInterval(() => {
+            fetch(`/task/gau-${domain}`, {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.urls_count !== undefined) {
+                    progressIndicator.innerHTML = `<span>${data.urls_count} URLs found</span>`;
+                }
+            })
+            .catch(error => console.error('Error polling GAU progress:', error));
+        }, 1000);
+
         // Make AJAX request to run GAU
         fetch(`/run-gau?domain=${encodeURIComponent(domain)}`, {
             method: 'GET'
@@ -336,6 +450,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
+            // Clear polling interval
+            clearInterval(pollInterval);
+
             // Store the results
             fullResults.historicalUrls[domain] = data.urls || [];
 
@@ -345,14 +462,32 @@ document.addEventListener('DOMContentLoaded', function() {
             button.classList.add('view-button');
             gauLoading[domain] = false;
 
-            // Show a notification
-            alert(`Found ${data.urls.length} historical URLs for ${domain}`);
+            // Update progress indicator
+            progressIndicator.innerHTML = `<span>${data.urls.length} URLs found</span>`;
+            progressIndicator.classList.add('gau-complete');
+
+            // Remove progress indicator after a delay
+            setTimeout(() => {
+                progressIndicator.remove();
+            }, 3000);
         })
         .catch(error => {
+            // Clear polling interval
+            clearInterval(pollInterval);
+
             console.error('Error:', error);
             button.disabled = false;
             button.textContent = 'Run GAU (Failed)';
             gauLoading[domain] = false;
+
+            // Update progress indicator
+            progressIndicator.innerHTML = '<span class="error">Failed</span>';
+            progressIndicator.classList.add('gau-error');
+
+            // Remove progress indicator after a delay
+            setTimeout(() => {
+                progressIndicator.remove();
+            }, 3000);
         });
     }
 

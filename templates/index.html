@@ -62,7 +62,20 @@
 
         <div id="loading" class="loading hidden">
             <div class="spinner"></div>
-            <p>Scanning domain... This may take a few minutes.</p>
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <p id="progressMessage">Scanning domain... This may take a few minutes.</p>
+            <div class="progress-stats">
+                <div class="stat">
+                    <span class="stat-label">Subdomains:</span>
+                    <span id="progressSubdomains" class="stat-value">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Live Hosts:</span>
+                    <span id="progressLiveHosts" class="stat-value">0</span>
+                </div>
+            </div>
         </div>
 
         <div id="results" class="results hidden">

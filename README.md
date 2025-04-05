@@ -12,6 +12,8 @@ A Flask web application for finding subdomains and checking live hosts, based on
 - Collect historical URLs using gau (with 50 threads)
 - Color-coded HTTP status codes (2xx green, 3xx blue, 4xx red)
 - On-demand GAU scanning via buttons next to each live host
+- Real-time progress updates with Server-Sent Events
+- Progress bar and live counters during scanning
 - Clean web interface to display results
 - Filter and search through results
 

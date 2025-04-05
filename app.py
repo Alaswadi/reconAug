@@ -3,13 +3,62 @@ import json
 import subprocess
 import requests
 import re
-from flask import Flask, render_template, request, jsonify
+import time
+import uuid
+import threading
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from concurrent.futures import ThreadPoolExecutor
+from collections import defaultdict
 
 app = Flask(__name__)
 
 # Create output directory if it doesn't exist
 os.makedirs('output', exist_ok=True)
+
+# Task manager for background tasks
+class TaskManager:
+    def __init__(self):
+        self.tasks = {}
+        self.lock = threading.Lock()
+
+    def create_task(self, domain):
+        task_id = str(uuid.uuid4())
+        with self.lock:
+            self.tasks[task_id] = {
+                'domain': domain,
+                'status': 'starting',
+                'progress': 0,
+                'message': 'Initializing scan...',
+                'subdomains': [],
+                'subdomains_count': 0,
+                'live_hosts': [],
+                'live_hosts_count': 0,
+                'start_time': time.time(),
+                'last_update': time.time(),
+                'complete': False
+            }
+        return task_id
+
+    def update_task(self, task_id, **kwargs):
+        with self.lock:
+            if task_id in self.tasks:
+                for key, value in kwargs.items():
+                    self.tasks[task_id][key] = value
+                self.tasks[task_id]['last_update'] = time.time()
+
+    def get_task(self, task_id):
+        with self.lock:
+            return self.tasks.get(task_id, None)
+
+    def clean_old_tasks(self, max_age=3600):  # Clean tasks older than 1 hour
+        current_time = time.time()
+        with self.lock:
+            for task_id in list(self.tasks.keys()):
+                if current_time - self.tasks[task_id]['last_update'] > max_age:
+                    del self.tasks[task_id]
+
+# Initialize task manager
+task_manager = TaskManager()
 
 def check_tools():
     """Check if required tools are installed"""
@@ -241,6 +290,94 @@ def index():
     tools = check_tools()
     return render_template('index.html', tools=tools)
 
+def run_scan_in_background(task_id, domain):
+    """Run the scan in a background thread and update progress"""
+    try:
+        # Update task status
+        task_manager.update_task(task_id, status='running', message='Starting subdomain discovery...')
+
+        # Clean up any existing output files
+        for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",
+                            f"output/domain_{domain}.txt", f"output/httpx_{domain}.txt",
+                            f"output/gau_{domain}.txt"]:
+            if os.path.exists(file_pattern):
+                os.remove(file_pattern)
+
+        # Run subdomain discovery tools in parallel
+        task_manager.update_task(task_id, progress=10, message='Running subfinder...')
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            subfinder_future = executor.submit(get_subdomains_subfinder, domain)
+
+            # Update progress while subfinder is running
+            task_manager.update_task(task_id, progress=15, message='Running crt.sh and other passive sources...')
+            crtsh_future = executor.submit(get_subdomains_crtsh, domain)
+
+            subfinder_results = subfinder_future.result()
+            task_manager.update_task(task_id, progress=30, message=f'Found {len(subfinder_results)} subdomains with subfinder')
+
+            crtsh_results = crtsh_future.result()
+            task_manager.update_task(task_id, progress=40, message=f'Found {len(crtsh_results)} subdomains with passive sources')
+
+        # Combine and deduplicate results
+        all_domains = list(set(subfinder_results + crtsh_results))
+        task_manager.update_task(
+            task_id,
+            progress=50,
+            message=f'Found {len(all_domains)} unique subdomains',
+            subdomains=all_domains,
+            subdomains_count=len(all_domains)
+        )
+
+        # Save combined domains
+        with open(f"output/domain_{domain}.txt", 'w') as f:
+            for d in all_domains:
+                f.write(f"{d}\n")
+
+        # Start checking live hosts
+        task_manager.update_task(task_id, progress=60, message='Starting live host discovery with httpx...')
+
+        # Process live hosts in batches to provide updates
+        batch_size = max(10, len(all_domains) // 10)  # Process in 10 batches or batches of 10, whichever is larger
+        live_hosts = []
+
+        for i in range(0, len(all_domains), batch_size):
+            batch = all_domains[i:i+batch_size]
+            progress = 60 + int((i / len(all_domains)) * 35)  # Progress from 60% to 95%
+            task_manager.update_task(
+                task_id,
+                progress=progress,
+                message=f'Checking live hosts ({i}/{len(all_domains)})...'
+            )
+
+            batch_results = check_live_hosts(batch, domain)
+            live_hosts.extend(batch_results)
+
+            # Update live hosts as they come in
+            task_manager.update_task(
+                task_id,
+                live_hosts=live_hosts,
+                live_hosts_count=len(live_hosts)
+            )
+
+        # Scan complete
+        task_manager.update_task(
+            task_id,
+            status='complete',
+            progress=100,
+            message=f'Scan complete. Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts.',
+            complete=True
+        )
+
+    except Exception as e:
+        # Update task with error
+        task_manager.update_task(
+            task_id,
+            status='error',
+            message=f'Error during scan: {str(e)}',
+            complete=True
+        )
+        print(f"Error in background scan: {e}")
+
 @app.route('/scan', methods=['POST'])
 def scan():
     domain = request.form.get('domain', '').strip()
@@ -248,46 +385,113 @@ def scan():
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
 
-    # Clean up any existing output files
-    for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",
-                         f"output/domain_{domain}.txt", f"output/httpx_{domain}.txt",
-                         f"output/gau_{domain}.txt"]:
-        if os.path.exists(file_pattern):
-            os.remove(file_pattern)
+    # Create a new task
+    task_id = task_manager.create_task(domain)
 
-    # Run subdomain discovery tools in parallel
-    print(f"Starting subdomain discovery for {domain}...")
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        subfinder_future = executor.submit(get_subdomains_subfinder, domain)
-        crtsh_future = executor.submit(get_subdomains_crtsh, domain)
+    # Start the scan in a background thread
+    threading.Thread(target=run_scan_in_background, args=(task_id, domain)).start()
 
-        subfinder_results = subfinder_future.result()
-        crtsh_results = crtsh_future.result()
-
-    # Combine and deduplicate results
-    all_domains = list(set(subfinder_results + crtsh_results))
-    print(f"Found {len(all_domains)} unique subdomains for {domain}")
-
-    # Save combined domains
-    with open(f"output/domain_{domain}.txt", 'w') as f:
-        for d in all_domains:
-            f.write(f"{d}\n")
-
-    # Check live hosts in a separate thread
-    print(f"Checking live hosts for {domain}...")
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        live_hosts_future = executor.submit(check_live_hosts, all_domains, domain)
-        live_hosts = live_hosts_future.result()
-
-    print(f"Found {len(live_hosts)} live hosts for {domain}")
-
+    # Return the task ID immediately
     return jsonify({
+        'task_id': task_id,
         'domain': domain,
-        'subdomains_count': len(all_domains),
-        'live_hosts_count': len(live_hosts),
-        'subdomains': all_domains,
-        'live_hosts': live_hosts
+        'status': 'started'
     })
+
+@app.route('/task/<task_id>', methods=['GET'])
+def get_task(task_id):
+    """Get the current status of a task"""
+    task = task_manager.get_task(task_id)
+
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    return jsonify(task)
+
+@app.route('/task/<task_id>/events')
+def task_events(task_id):
+    """Server-Sent Events endpoint for real-time task updates"""
+    def generate():
+        last_progress = -1
+        last_status = None
+        last_message = None
+        last_subdomains_count = 0
+        last_live_hosts_count = 0
+
+        # Initial delay to allow the task to start
+        time.sleep(0.5)
+
+        while True:
+            task = task_manager.get_task(task_id)
+
+            if not task:
+                # Task not found, send error and end stream
+                yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
+                break
+
+            # Check if there are updates to send
+            if (task['progress'] != last_progress or
+                task['status'] != last_status or
+                task['message'] != last_message or
+                task['subdomains_count'] != last_subdomains_count or
+                task['live_hosts_count'] != last_live_hosts_count):
+
+                # Send the update
+                yield f"data: {json.dumps({k: v for k, v in task.items() if k not in ['subdomains', 'live_hosts']})}\n\n"
+
+                # Update last values
+                last_progress = task['progress']
+                last_status = task['status']
+                last_message = task['message']
+                last_subdomains_count = task['subdomains_count']
+                last_live_hosts_count = task['live_hosts_count']
+
+            # If task is complete, end the stream
+            if task['complete']:
+                break
+
+            # Wait before checking again
+            time.sleep(1)
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+def run_gau_in_background(task_id, domain):
+    """Run GAU in a background thread and update progress"""
+    try:
+        # Initialize task
+        task_manager.update_task(task_id, status='running', message=f'Running GAU for {domain}...', urls_count=0)
+
+        # Run GAU for the specific domain
+        urls, error = get_historical_urls(domain)
+
+        if error:
+            print(f"Error running GAU for {domain}: {error}")
+            task_manager.update_task(
+                task_id,
+                status='error',
+                message=f'Error running GAU: {error}',
+                complete=True
+            )
+            return
+
+        # Update task with results
+        print(f"Found {len(urls)} historical URLs for {domain}")
+        task_manager.update_task(
+            task_id,
+            status='complete',
+            message=f'Found {len(urls)} historical URLs',
+            urls=urls,
+            urls_count=len(urls),
+            complete=True
+        )
+    except Exception as e:
+        print(f"Error in background GAU: {e}")
+        task_manager.update_task(
+            task_id,
+            status='error',
+            message=f'Error: {str(e)}',
+            complete=True
+        )
 
 @app.route('/run-gau', methods=['GET'])
 def run_gau():
@@ -296,22 +500,31 @@ def run_gau():
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
 
-    print(f"Running GAU for {domain}...")
-    # Run GAU for the specific domain
-    urls, error = get_historical_urls(domain)
+    # Create a task ID for this GAU run
+    task_id = f"gau-{domain}"
 
-    if error:
-        print(f"Error running GAU for {domain}: {error}")
+    # Check if there's already a completed task for this domain
+    existing_task = task_manager.get_task(task_id)
+    if existing_task and existing_task['complete'] and existing_task['status'] == 'complete':
+        # Return cached results
         return jsonify({
-            'error': error,
-            'urls': []
-        }), 500
+            'domain': domain,
+            'count': existing_task['urls_count'],
+            'urls': existing_task['urls']
+        })
 
-    print(f"Found {len(urls)} historical URLs for {domain}")
+    # Create a new task
+    task_manager.create_task(domain)
+    task_manager.update_task(task_id, domain=domain, urls=[])
+
+    # Start GAU in a background thread
+    threading.Thread(target=run_gau_in_background, args=(task_id, domain)).start()
+
+    # Return immediately with a task ID
     return jsonify({
+        'task_id': task_id,
         'domain': domain,
-        'count': len(urls),
-        'urls': urls
+        'status': 'started'
     })
 
 if __name__ == '__main__':
