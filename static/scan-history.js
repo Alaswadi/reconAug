@@ -97,20 +97,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to load scan history
     function loadScanHistory() {
+        console.log('Loading scan history...');
+        scanHistoryTable.innerHTML = '<tr><td colspan="5">Loading scan history...</td></tr>';
+
         fetch('/scan-history')
             .then(response => {
+                console.log('Scan history response status:', response.status);
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    throw new Error(`Network response was not ok: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('Scan history data received:', data);
                 scanHistory = data.scans || [];
+                console.log(`Found ${scanHistory.length} scan records`);
                 populateScanHistoryTable(scanHistory);
             })
             .catch(error => {
                 console.error('Error loading scan history:', error);
-                scanHistoryTable.innerHTML = '<tr><td colspan="5">Error loading scan history</td></tr>';
+                scanHistoryTable.innerHTML = `<tr><td colspan="5">Error loading scan history: ${error.message}</td></tr>`;
             });
     }
 

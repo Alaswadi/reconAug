@@ -808,12 +808,20 @@ def get_common_service(port):
 def scan_history():
     """Get scan history"""
     try:
+        print("Fetching scan history from database...")
         scans = Scan.query.order_by(Scan.timestamp.desc()).all()
+        print(f"Found {len(scans)} scan records in database")
+
+        # Convert to dict and log for debugging
+        scan_dicts = [scan.to_dict() for scan in scans]
+        print(f"Returning {len(scan_dicts)} scan records as JSON")
+
         return jsonify({
-            'scans': [scan.to_dict() for scan in scans]
+            'scans': scan_dicts
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error fetching scan history: {e}")
+        return jsonify({'error': str(e), 'message': 'Failed to fetch scan history'}), 500
 
 # Route to get scan details
 @app.route('/scan/<int:scan_id>')
@@ -864,6 +872,56 @@ def host_ports(host_id):
 
 # Create tables when the app starts
 create_tables()
+
+# Add a test scan if the database is empty
+def add_test_scan():
+    with app.app_context():
+        # Check if there are any scans in the database
+        if Scan.query.count() == 0:
+            print("Adding test scan to database...")
+            try:
+                # Create a test scan
+                test_scan = Scan(
+                    domain="example.com",
+                    timestamp=datetime.utcnow(),
+                    status="complete",
+                    subdomains_count=3,
+                    live_hosts_count=2
+                )
+                db.session.add(test_scan)
+                db.session.flush()  # Get the scan ID
+
+                # Add test subdomains
+                subdomains = ["www.example.com", "api.example.com", "mail.example.com"]
+                for subdomain in subdomains:
+                    db.session.add(Subdomain(
+                        scan_id=test_scan.id,
+                        name=subdomain,
+                        source="test"
+                    ))
+
+                # Add test live hosts
+                live_hosts = [
+                    {"url": "http://www.example.com", "status_code": "200", "technology": "Apache"},
+                    {"url": "http://api.example.com", "status_code": "200", "technology": "Nginx"}
+                ]
+                for host in live_hosts:
+                    db.session.add(LiveHost(
+                        scan_id=test_scan.id,
+                        url=host["url"],
+                        status_code=host["status_code"],
+                        technology=host["technology"]
+                    ))
+
+                # Commit changes
+                db.session.commit()
+                print("Test scan added successfully")
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error adding test scan: {e}")
+
+# Add a test scan if needed
+add_test_scan()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
