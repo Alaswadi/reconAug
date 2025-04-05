@@ -438,6 +438,10 @@ def check_ports(host):
 def index():
     return render_template('index.html')
 
+@app.route('/history')
+def scan_history_page():
+    return render_template('history.html')
+
 def run_scan_in_background(task_id, domain):
     """Run the scan in a background thread and update progress"""
     try:

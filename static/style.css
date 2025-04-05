@@ -42,6 +42,36 @@ header h1 {
     margin-bottom: 10px;
 }
 
+/* Navigation links */
+.nav-links {
+    margin-top: 15px;
+}
+
+.nav-link {
+    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background-color 0.3s;
+    margin: 0 5px;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    text-decoration: none;
+}
+
+/* Content box for pages */
+.content-box {
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
 .search-form {
     background-color: white;
     padding: 20px;
