@@ -358,7 +358,7 @@ a:hover {
     padding: 20px;
     border-radius: 5px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    max-width: 600px;
+    max-width: 800px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
@@ -376,6 +376,87 @@ a:hover {
 
 .close-button:hover {
     color: #000;
+}
+
+/* Scan History styles */
+.scan-history-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+.scan-history-button:hover {
+    background-color: #45a049;
+}
+
+/* Scan Details Modal styles */
+.scan-details-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.scan-tab-button {
+    flex: 1;
+    background-color: #f1f1f1;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background-color 0.3s;
+}
+
+.scan-tab-button:hover {
+    background-color: #ddd;
+}
+
+.scan-tab-button.active {
+    background-color: white;
+    border-bottom: 3px solid var(--primary-color);
+}
+
+.scan-tab-content {
+    padding: 20px 0;
+}
+
+.scan-tab-pane {
+    display: none;
+}
+
+.scan-tab-pane.active {
+    display: block;
+}
+
+/* Date formatting */
+.scan-date {
+    white-space: nowrap;
+    color: #666;
+}
+
+/* Action buttons */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.view-button-sm {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.view-button-sm:hover {
+    background-color: #0b7dda;
 }
 
 .port-list {

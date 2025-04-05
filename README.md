@@ -18,6 +18,8 @@ A Flask web application for finding subdomains and checking live hosts, based on
 - On-demand port scanning via buttons next to each live host
 - Real-time progress updates with Server-Sent Events
 - Progress bar and live counters during scanning
+- SQLite database for storing scan results
+- Scan history with ability to view past results
 - Clean web interface to display results
 - Filter and search through results
 

@@ -8,4 +8,5 @@ services:
       - "5001:5001"
     volumes:
       - ./output:/app/output
+      - ./instance:/app/instance
     restart: unless-stopped

@@ -6,11 +6,22 @@ import re
 import time
 import uuid
 import threading
+import urllib.parse
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
+from datetime import datetime
+
+from models import db, Scan, Subdomain, LiveHost, Port, HistoricalUrl
 
 app = Flask(__name__)
+
+# Configure SQLite database
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///reconaug.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize the database
+db.init_app(app)
 
 # Create output directory if it doesn't exist
 os.makedirs('output', exist_ok=True)
@@ -500,12 +511,20 @@ def run_scan_in_background(task_id, domain):
                 live_hosts_count=len(live_hosts)
             )
 
+        # Save results to database
+        try:
+            scan_id = save_scan_to_database(domain, all_domains, live_hosts)
+            db_message = f'Scan complete. Results saved to database (ID: {scan_id}).' if scan_id else 'Scan complete. Note: Failed to save results to database.'
+        except Exception as db_error:
+            print(f"Error saving to database: {db_error}")
+            db_message = 'Scan complete. Note: Failed to save results to database.'
+
         # Scan complete
         task_manager.update_task(
             task_id,
             status='complete',
             progress=100,
-            message=f'Scan complete. Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts.',
+            message=f'Scan complete. Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts. {db_message}',
             complete=True
         )
 
@@ -615,6 +634,25 @@ def run_gau():
         }), 500
 
     print(f"Found {len(urls)} historical URLs for {domain}")
+
+    # Try to find the most recent scan for this domain to associate the URLs with
+    try:
+        scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
+        if scan:
+            # Check if we already have historical URLs for this scan
+            existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
+            if existing_urls == 0:
+                # Save historical URLs to database
+                for url in urls:
+                    db.session.add(HistoricalUrl(
+                        scan_id=scan.id,
+                        url=url
+                    ))
+                db.session.commit()
+                print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+    except Exception as e:
+        print(f"Error saving historical URLs to database: {e}")
+
     return jsonify({
         'domain': domain,
         'count': len(urls),
@@ -640,11 +678,186 @@ def scan_ports():
         }), 500
 
     print(f"Found {len(ports)} open ports for {host}")
+
+    # Save port scan results to database
+    try:
+        success = save_ports_to_database(host, ports)
+        if success:
+            print(f"Saved {len(ports)} ports to database for host {host}")
+    except Exception as e:
+        print(f"Error saving ports to database: {e}")
+
     return jsonify({
         'host': host,
         'count': len(ports),
         'ports': ports
     })
 
+# Create database tables before first request
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
+# Helper function to save scan results to database
+def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
+    """Save scan results to the database"""
+    try:
+        # Create a new scan record
+        scan = Scan(
+            domain=domain,
+            timestamp=datetime.utcnow(),
+            status='complete',
+            subdomains_count=len(subdomains),
+            live_hosts_count=len(live_hosts)
+        )
+        db.session.add(scan)
+        db.session.flush()  # Get the scan ID without committing
+
+        # Add subdomains
+        for subdomain in subdomains:
+            db.session.add(Subdomain(
+                scan_id=scan.id,
+                name=subdomain,
+                source='combined'  # We don't track individual sources in this version
+            ))
+
+        # Add live hosts
+        for host in live_hosts:
+            live_host = LiveHost(
+                scan_id=scan.id,
+                url=host['url'],
+                status_code=host['status_code'],
+                technology=host['technology']
+            )
+            db.session.add(live_host)
+            db.session.flush()  # Get the live host ID
+
+        # Add historical URLs if available
+        if historical_urls:
+            for url in historical_urls:
+                db.session.add(HistoricalUrl(
+                    scan_id=scan.id,
+                    url=url
+                ))
+
+        # Commit all changes
+        db.session.commit()
+        print(f"Scan results for {domain} saved to database")
+        return scan.id
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error saving scan results to database: {e}")
+        return None
+
+# Helper function to save port scan results to database
+def save_ports_to_database(host_url, ports):
+    """Save port scan results to the database"""
+    try:
+        # Find the live host record
+        host = LiveHost.query.filter_by(url=host_url).first()
+        if not host:
+            print(f"Live host {host_url} not found in database")
+            return False
+
+        # Add ports
+        for port in ports:
+            db.session.add(Port(
+                host_id=host.id,
+                port_number=port,
+                service=get_common_service(port)
+            ))
+
+        # Commit changes
+        db.session.commit()
+        print(f"Port scan results for {host_url} saved to database")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error saving port scan results to database: {e}")
+        return False
+
+# Helper function to get common service name for a port
+def get_common_service(port):
+    """Return common service name for a port number"""
+    common_ports = {
+        21: 'FTP',
+        22: 'SSH',
+        23: 'Telnet',
+        25: 'SMTP',
+        53: 'DNS',
+        80: 'HTTP',
+        110: 'POP3',
+        143: 'IMAP',
+        443: 'HTTPS',
+        445: 'SMB',
+        3306: 'MySQL',
+        3389: 'RDP',
+        5432: 'PostgreSQL',
+        8080: 'HTTP-Proxy',
+        8443: 'HTTPS-Alt'
+    }
+    return common_ports.get(port, 'Unknown')
+
+# Route to get scan history
+@app.route('/scan-history')
+def scan_history():
+    """Get scan history"""
+    try:
+        scans = Scan.query.order_by(Scan.timestamp.desc()).all()
+        return jsonify({
+            'scans': [scan.to_dict() for scan in scans]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Route to get scan details
+@app.route('/scan/<int:scan_id>')
+def scan_details(scan_id):
+    """Get details of a specific scan"""
+    try:
+        scan = Scan.query.get_or_404(scan_id)
+        subdomains = [s.name for s in scan.subdomains]
+        live_hosts = [h.to_dict() for h in scan.live_hosts]
+
+        return jsonify({
+            'scan': scan.to_dict(),
+            'subdomains': subdomains,
+            'live_hosts': live_hosts
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Route to get historical URLs for a scan
+@app.route('/scan/<int:scan_id>/historical-urls')
+def scan_historical_urls(scan_id):
+    """Get historical URLs for a specific scan"""
+    try:
+        urls = HistoricalUrl.query.filter_by(scan_id=scan_id).all()
+        return jsonify({
+            'urls': [url.url for url in urls]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Route to get ports for a live host
+@app.route('/host/<int:host_id>/ports')
+def host_ports(host_id):
+    """Get ports for a specific live host"""
+    try:
+        host = LiveHost.query.get_or_404(host_id)
+        ports = [{
+            'port': p.port_number,
+            'service': p.service
+        } for p in host.ports]
+
+        return jsonify({
+            'host': host.to_dict(),
+            'ports': ports
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # Create tables before running the app
     app.run(host='0.0.0.0', port=5001, debug=True)

@@ -17,11 +17,14 @@ RUN git clone https://github.com/aboul3la/Sublist3r.git /tools/Sublist3r \
     && pip install -r requirements.txt
 
 # Create directories
-RUN mkdir -p /tools /app/output /root/.config/subfinder /root/.config/httpx /root/.config/naabu
+RUN mkdir -p /tools /app/output /app/instance /root/.config/subfinder /root/.config/httpx /root/.config/naabu
 
 # Set up Chaos API key for subfinder
 RUN mkdir -p /root/.config/subfinder
 RUN echo '{"chaos_api_key": "47a628d5-3721-4ae6-8369-a1111e509cfb"}' > /root/.config/subfinder/config.yaml
+
+# Create volume for database persistence
+VOLUME /app/instance
 
 # Install subfinder
 RUN wget -q https://github.com/projectdiscovery/subfinder/releases/download/v2.6.3/subfinder_2.6.3_linux_amd64.zip -O /tmp/subfinder.zip \
