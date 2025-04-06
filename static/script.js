@@ -49,15 +49,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to update the progress UI
     function updateProgress(data) {
-        progressBar.style.width = `${data.progress}%`;
-        progressMessage.textContent = data.message;
-        progressSubdomains.textContent = data.subdomains_count;
-        progressLiveHosts.textContent = data.live_hosts_count;
+        console.log('Updating progress UI with data:', data);
+
+        // Update progress bar
+        if (data.progress !== undefined) {
+            progressBar.style.width = `${data.progress}%`;
+        }
+
+        // Update message
+        if (data.message !== undefined) {
+            progressMessage.textContent = data.message;
+        }
+
+        // Update subdomains count if available
+        if (data.subdomains_count !== undefined) {
+            progressSubdomains.textContent = data.subdomains_count;
+        }
+
+        // Update live hosts count if available
+        if (data.live_hosts_count !== undefined) {
+            progressLiveHosts.textContent = data.live_hosts_count;
+        }
 
         // If the task is complete, fetch the full results
         if (data.status === 'complete') {
+            console.log('Task complete, fetching full results');
             fetchTaskResults(currentTaskId);
         } else if (data.status === 'error') {
+            console.error('Task error:', data.message);
             alert(`Error: ${data.message}`);
             loadingDiv.classList.add('hidden');
             scanButton.disabled = false;
@@ -130,8 +149,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Listen for messages
         eventSource.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            updateProgress(data);
+            console.log('SSE message received:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Parsed SSE data:', data);
+                updateProgress(data);
+            } catch (error) {
+                console.error('Error parsing SSE data:', error);
+                console.error('Raw event data:', event.data);
+            }
         };
 
         // Handle errors

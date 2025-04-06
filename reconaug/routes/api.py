@@ -230,23 +230,39 @@ def get_task(task_id):
 @api_bp.route('/task/<task_id>/events')
 def task_events(task_id):
     """Server-sent events endpoint for real-time updates"""
+    print(f"SSE connection established for task: {task_id}")
 
     def generate():
         last_status = None
+        counter = 0
         while True:
+            counter += 1
             task = task_manager.get_task(task_id)
+
+            if counter % 10 == 0:  # Log every 10 seconds
+                print(f"SSE heartbeat for task {task_id}, counter: {counter}")
+                if task:
+                    print(f"Task status: {task['status']}, progress: {task['progress']}, complete: {task['complete']}")
+                else:
+                    print(f"Task not found: {task_id}")
+
             if not task:
+                print(f"Task not found in SSE: {task_id}")
                 yield f"data: {{'error': 'Task not found'}}\\n\\n"
                 break
 
             # Only send updates if the status has changed
             current_status = f"{task['status']}-{task['progress']}-{task['message']}"
             if current_status != last_status:
-                yield f"data: {{'status': '{task['status']}', 'progress': {task['progress']}, 'message': '{task['message']}', 'complete': {str(task['complete']).lower()}}}\\n\\n"
+                print(f"Sending SSE update for task {task_id}: {current_status}")
+                data_json = f"data: {{'status': '{task['status']}', 'progress': {task['progress']}, 'message': '{task['message']}', 'complete': {str(task['complete']).lower()}}}\\n\\n"
+                yield data_json
                 last_status = current_status
+                print(f"SSE update sent for task {task_id}")
 
             # If the task is complete, stop sending updates
             if task['complete']:
+                print(f"Task {task_id} is complete, closing SSE connection")
                 break
 
             time.sleep(1)
@@ -303,6 +319,50 @@ def clear_database():
         })
     except Exception as e:
         db.session.rollback()
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+@api_bp.route('/debug/task/<task_id>')
+def debug_task(task_id):
+    """Debug endpoint to check task status"""
+    try:
+        # Get the task
+        task = task_manager.get_task(task_id)
+        if not task:
+            return jsonify({
+                'error': f'Task {task_id} not found',
+                'status': 'error',
+                'all_tasks': list(task_manager.tasks.keys())
+            }), 404
+
+        # Return the task details
+        return jsonify({
+            'task': task,
+            'status': 'success'
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+@api_bp.route('/debug/tasks')
+def debug_all_tasks():
+    """Debug endpoint to list all tasks"""
+    try:
+        # Get all tasks
+        with task_manager.task_lock:
+            tasks = {task_id: task.copy() for task_id, task in task_manager.tasks.items()}
+
+        # Return the tasks
+        return jsonify({
+            'tasks': tasks,
+            'count': len(tasks),
+            'status': 'success'
+        })
+    except Exception as e:
         return jsonify({
             'error': str(e),
             'status': 'error'

@@ -97,6 +97,7 @@ def scan_details_page(scan_id):
 def run_scan_in_background(domain, task_id, app):
     """Run the scan in a background thread"""
     try:
+        print(f"Starting background scan for domain: {domain}, task ID: {task_id}")
         # Create output directory if it doesn't exist
         os.makedirs('output', exist_ok=True)
 
@@ -108,22 +109,27 @@ def run_scan_in_background(domain, task_id, app):
                 os.remove(file_pattern)
 
         # Run subdomain discovery tools in parallel
+        print(f"Updating task {task_id} to 10% - Running subfinder and Sublist3r...")
         task_manager.update_task(task_id, progress=10, message='Running subfinder and Sublist3r...')
         with ThreadPoolExecutor(max_workers=3) as executor:
             subfinder_future = executor.submit(get_subdomains_subfinder, domain)
             sublist3r_future = executor.submit(get_subdomains_sublist3r, domain)
 
             # Update progress while other tools are running
+            print(f"Updating task {task_id} to 15% - Running crt.sh and other passive sources...")
             task_manager.update_task(task_id, progress=15, message='Running crt.sh and other passive sources...')
             crtsh_future = executor.submit(get_subdomains_crtsh, domain)
 
             subfinder_results = subfinder_future.result()
+            print(f"Updating task {task_id} to 25% - Found {len(subfinder_results)} subdomains with subfinder")
             task_manager.update_task(task_id, progress=25, message=f'Found {len(subfinder_results)} subdomains with subfinder')
 
             sublist3r_results = sublist3r_future.result()
+            print(f"Updating task {task_id} to 30% - Found {len(sublist3r_results)} subdomains with Sublist3r")
             task_manager.update_task(task_id, progress=30, message=f'Found {len(sublist3r_results)} subdomains with Sublist3r')
 
             crtsh_results = crtsh_future.result()
+            print(f"Updating task {task_id} to 40% - Found {len(crtsh_results)} subdomains with passive sources")
             task_manager.update_task(task_id, progress=40, message=f'Found {len(crtsh_results)} subdomains with passive sources')
 
         # Combine and deduplicate results
@@ -135,6 +141,7 @@ def run_scan_in_background(domain, task_id, app):
             for d in all_domains:
                 f.write(f"{d}\\n")
 
+        print(f"Updating task {task_id} to 50% - Found {len(all_domains)} unique subdomains. Checking live hosts...")
         task_manager.update_task(
             task_id,
             progress=50,
@@ -144,6 +151,7 @@ def run_scan_in_background(domain, task_id, app):
         # Check which domains are live
         live_hosts = check_live_hosts(all_domains)
 
+        print(f"Updating task {task_id} to 80% - Found {len(live_hosts)} live hosts")
         task_manager.update_task(
             task_id,
             progress=80,
@@ -171,6 +179,7 @@ def run_scan_in_background(domain, task_id, app):
             db_message = 'Scan complete. Note: Failed to save results to database.'
 
         # Scan complete
+        print(f"Updating task {task_id} to 100% - Scan complete")
         task_manager.update_task(
             task_id,
             status='complete',
@@ -178,11 +187,13 @@ def run_scan_in_background(domain, task_id, app):
             message=f'Scan complete. Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts. {db_message}',
             complete=True
         )
+        print(f"Task {task_id} marked as complete")
     except Exception as e:
         print(f"Error in background scan: {e}")
         import traceback
         traceback.print_exc()
 
+        print(f"Updating task {task_id} to error state")
         task_manager.update_task(
             task_id,
             status='error',
@@ -190,3 +201,4 @@ def run_scan_in_background(domain, task_id, app):
             message=f'Error: {str(e)}',
             complete=True
         )
+        print(f"Task {task_id} marked as error")
