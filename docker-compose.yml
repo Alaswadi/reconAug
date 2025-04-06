@@ -10,3 +10,24 @@ services:
       - ./output:/app/output
       - ./instance:/app/instance
     restart: unless-stopped
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: reconaug-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  celery-worker:
+    build: .
+    container_name: reconaug-celery-worker
+    command: celery -A reconaug.celery_app.celery worker --loglevel=info
+    volumes:
+      - ./output:/app/output
+      - ./instance:/app/instance
+    depends_on:
+      - redis
+      - reconaug
+    restart: unless-stopped

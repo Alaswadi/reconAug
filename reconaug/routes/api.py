@@ -194,38 +194,60 @@ def scan_ports_api():
 
 @api_bp.route('/task/<task_id>')
 def get_task(task_id):
-    """Get task details"""
-    task = task_manager.get_task(task_id)
-    if not task:
-        return jsonify({'error': 'Task not found'}), 404
+    """Get task details from Celery"""
+    try:
+        from reconaug.tasks import celery
+        task = celery.AsyncResult(task_id)
 
-    # If the task is complete, include the full results
-    if task['complete'] and task['status'] == 'complete':
-        try:
-            # Get the domain from the task
-            domain = task['domain']
+        if task.state == 'PENDING':
+            response = {
+                'status': 'pending',
+                'progress': 0,
+                'message': 'Task is pending...',
+                'subdomains_count': 0,
+                'live_hosts_count': 0
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'status': 'error',
+                'progress': 100,
+                'message': str(task.info),
+                'complete': True
+            }
+        elif task.state == 'SUCCESS':
+            response = task.result
 
-            # Get the scan from the database
-            scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
-            if scan:
-                # Get subdomains and live hosts
-                subdomains = [s.name for s in scan.subdomains]
-                live_hosts = [h.to_dict() for h in scan.live_hosts]
+            # If the task is complete, include the full results
+            if response.get('status') == 'complete' and response.get('scan_id'):
+                try:
+                    # Get the scan from the database
+                    scan_id = response.get('scan_id')
+                    scan = Scan.query.get(scan_id)
+                    if scan:
+                        # Get subdomains and live hosts
+                        subdomains = [s.name for s in scan.subdomains]
+                        live_hosts = [h.to_dict() for h in scan.live_hosts]
 
-                # Return the full results
-                return jsonify({
-                    'task': task,
-                    'domain': domain,
-                    'subdomains': subdomains,
-                    'subdomains_count': len(subdomains),
-                    'live_hosts': live_hosts,
-                    'live_hosts_count': len(live_hosts)
-                })
-        except Exception as e:
-            print(f"Error getting task results: {e}")
+                        # Add to the response
+                        response['subdomains'] = subdomains
+                        response['live_hosts'] = live_hosts
+                except Exception as e:
+                    print(f"Error getting scan details: {e}")
+        else:
+            response = task.info or {
+                'status': 'running',
+                'progress': 0,
+                'message': 'Task is running...',
+                'subdomains_count': 0,
+                'live_hosts_count': 0
+            }
 
-    # Otherwise, just return the task status
-    return jsonify(task)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 @api_bp.route('/task/<task_id>/events')
 def task_events(task_id):

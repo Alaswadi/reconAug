@@ -3,30 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subdomains Finder</title>
+    <title>ReconAug Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-search"></i> Subdomains Finder</h1>
-            <p>Discover subdomains and check live hosts</p>
-            <div class="nav-links">
+            <h1><i class="fas fa-tachometer-alt"></i> ReconAug Dashboard</h1>
+            <nav>
+                <a href="{{ url_for('main.index') }}" class="nav-link active"><i class="fas fa-home"></i> Home</a>
                 <a href="{{ url_for('main.scan_history_page') }}" class="nav-link"><i class="fas fa-history"></i> Scan History</a>
-            </div>
+            </nav>
         </header>
 
-        <div class="search-form">
-            <form id="scanForm">
-                <div class="input-group">
-                    <input type="text" id="domain" name="domain" placeholder="Enter domain (e.g., example.com)" required>
-                    <button type="submit" id="scanButton">
-                        <i class="fas fa-search"></i> Scan
-                    </button>
+        <main>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-search"></i> New Scan</h2>
                 </div>
-            </form>
-        </div>
+                <div class="card-body">
+                    <p>Enter a domain to start a new reconnaissance scan.</p>
+                    <form id="scanForm">
+                        <div class="input-group">
+                            <input type="text" id="domain" name="domain" placeholder="Enter domain (e.g., example.com)" required>
+                            <button type="submit" id="scanButton" class="primary-button">
+                                <i class="fas fa-search"></i> Start Scan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
         <div id="loading" class="loading hidden">
             <div class="spinner"></div>

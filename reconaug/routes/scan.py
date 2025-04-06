@@ -34,26 +34,17 @@ def scan():
             print(f"Error: Invalid domain format: {domain}")
             return jsonify({'error': 'Invalid domain format'}), 400
 
-        # Create a task for this scan
-        task_id = task_manager.create_task(domain)
-        print(f"Created task with ID: {task_id}")
+        # Start the Celery task
+        from reconaug.tasks import run_scan_task
+        task = run_scan_task.delay(domain)
+        print(f"Started Celery task with ID: {task.id}")
 
-        # Get the current application object
-        app = current_app._get_current_object()
-
-        # Start the scan in a background thread
-        scan_thread = threading.Thread(
-            target=run_scan_in_background,
-            args=(domain, task_id, app)
-        )
-        scan_thread.daemon = True
-        scan_thread.start()
-        print(f"Started background scan thread for domain: {domain}, task ID: {task_id}")
-
+        # Redirect to the scan progress page
         return jsonify({
-            'task_id': task_id,
+            'task_id': task.id,
             'domain': domain,
-            'status': 'started'
+            'status': 'started',
+            'redirect': f'/scan/progress/{task.id}'
         })
     except Exception as e:
         print(f"Error in scan endpoint: {e}")
@@ -61,14 +52,65 @@ def scan():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@scan_bp.route('/scan-status/<task_id>')
-def scan_status(task_id):
-    """Get scan status"""
-    task = task_manager.get_task(task_id)
-    if not task:
-        return jsonify({'error': 'Task not found'}), 404
+@scan_bp.route('/progress/<task_id>')
+def scan_progress_page(task_id):
+    """Page to display scan progress"""
+    try:
+        # Get the task from Celery
+        from reconaug.tasks import celery
+        task = celery.AsyncResult(task_id)
 
-    return jsonify(task)
+        # Get the domain from the task
+        domain = ""
+        if task.state == 'SUCCESS' and task.result:
+            domain = task.result.get('domain', '')
+
+        return render_template('scan_progress.html', task_id=task_id, domain=domain)
+    except Exception as e:
+        print(f"Error rendering scan progress page: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error: {str(e)}", 500
+
+@scan_bp.route('/task-status/<task_id>')
+def task_status(task_id):
+    """Get task status from Celery"""
+    try:
+        from reconaug.tasks import celery
+        task = celery.AsyncResult(task_id)
+
+        if task.state == 'PENDING':
+            response = {
+                'status': 'pending',
+                'progress': 0,
+                'message': 'Task is pending...',
+                'subdomains_count': 0,
+                'live_hosts_count': 0
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'status': 'error',
+                'progress': 100,
+                'message': str(task.info),
+                'complete': True
+            }
+        elif task.state == 'SUCCESS':
+            response = task.result
+        else:
+            response = task.info or {
+                'status': 'running',
+                'progress': 0,
+                'message': 'Task is running...',
+                'subdomains_count': 0,
+                'live_hosts_count': 0
+            }
+
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 @scan_bp.route('/scan-details/<int:scan_id>')
 def scan_details_page(scan_id):

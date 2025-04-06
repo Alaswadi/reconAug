@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReconAug Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-tachometer-alt"></i> ReconAug Dashboard</h1>
+            <nav>
+                <a href="{{ url_for('main.index') }}" class="nav-link active"><i class="fas fa-home"></i> Home</a>
+                <a href="{{ url_for('main.scan_history_page') }}" class="nav-link"><i class="fas fa-history"></i> Scan History</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-search"></i> New Scan</h2>
+                </div>
+                <div class="card-body">
+                    <p>Enter a domain to start a new reconnaissance scan.</p>
+                    <form id="scanForm">
+                        <div class="input-group">
+                            <input type="text" id="domain" name="domain" placeholder="Enter domain (e.g., example.com)" required>
+                            <button type="submit" id="scanButton" class="primary-button">
+                                <i class="fas fa-search"></i> Start Scan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-history"></i> Recent Scans</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table id="recentScansTable">
+                            <tr>
+                                <th>Domain</th>
+                                <th>Date</th>
+                                <th>Subdomains</th>
+                                <th>Live Hosts</th>
+                                <th>Actions</th>
+                            </tr>
+                            <tr>
+                                <td colspan="5" class="loading-data">Loading recent scans...</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-tools"></i> Tools Status</h2>
+                </div>
+                <div class="card-body">
+                    <div class="tools-grid" id="toolsStatus">
+                        <div class="tool-item">
+                            <span class="tool-name">Subfinder</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                        <div class="tool-item">
+                            <span class="tool-name">Httpx</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                        <div class="tool-item">
+                            <span class="tool-name">GAU</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                        <div class="tool-item">
+                            <span class="tool-name">Naabu</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                        <div class="tool-item">
+                            <span class="tool-name">Chaos API</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                        <div class="tool-item">
+                            <span class="tool-name">Sublist3r</span>
+                            <span class="tool-status loading">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <div class="progress-message" id="progressMessage">Starting scan...</div>
+        </div>
+
+        <footer>
+            <p>&copy; 2023 ReconAug - Reconnaissance Augmentation Tool</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const scanForm = document.getElementById('scanForm');
+            const scanButton = document.getElementById('scanButton');
+            const domainInput = document.getElementById('domain');
+            const loadingDiv = document.getElementById('loading');
+            const progressMessage = document.getElementById('progressMessage');
+            const recentScansTable = document.getElementById('recentScansTable');
+            const toolsStatus = document.getElementById('toolsStatus');
+
+            // Load recent scans
+            loadRecentScans();
+
+            // Check tools status
+            checkToolsStatus();
+
+            // Handle form submission
+            scanForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const domain = domainInput.value.trim();
+                if (!domain) {
+                    alert('Please enter a domain');
+                    return;
+                }
+
+                // Show loading
+                scanButton.disabled = true;
+                scanButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+
+                // Submit the form
+                fetch('/scan/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `domain=${encodeURIComponent(domain)}`
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Scan started:', data);
+
+                    // Reset form
+                    scanButton.disabled = false;
+                    scanButton.innerHTML = '<i class="fas fa-search"></i> Start Scan';
+
+                    // Redirect to the scan progress page
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        window.location.href = `/scan/progress/${data.task_id}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting scan:', error);
+                    scanButton.disabled = false;
+                    scanButton.innerHTML = '<i class="fas fa-search"></i> Start Scan';
+                    alert('An error occurred while starting the scan. Please try again.');
+                });
+            });
+
+            // Function to load recent scans
+            function loadRecentScans() {
+                fetch('/api/scan-history')
+                .then(response => response.json())
+                .then(data => {
+                    // Clear the table except for the header
+                    recentScansTable.innerHTML = '<tr><th>Domain</th><th>Date</th><th>Subdomains</th><th>Live Hosts</th><th>Actions</th></tr>';
+
+                    if (!data.scans || data.scans.length === 0) {
+                        const row = document.createElement('tr');
+                        const cell = document.createElement('td');
+                        cell.colSpan = 5;
+                        cell.className = 'no-data';
+                        cell.textContent = 'No scan history found. Try scanning a domain.';
+                        row.appendChild(cell);
+                        recentScansTable.appendChild(row);
+                        return;
+                    }
+
+                    // Show only the 5 most recent scans
+                    const recentScans = data.scans.slice(0, 5);
+
+                    // Add each scan to the table
+                    recentScans.forEach(scan => {
+                        const row = document.createElement('tr');
+
+                        // Domain cell
+                        const domainCell = document.createElement('td');
+                        domainCell.textContent = scan.domain;
+
+                        // Date cell
+                        const dateCell = document.createElement('td');
+                        const scanDate = new Date(scan.timestamp);
+                        dateCell.textContent = scanDate.toLocaleString();
+
+                        // Subdomains count cell
+                        const subdomainsCell = document.createElement('td');
+                        subdomainsCell.textContent = scan.subdomains_count;
+
+                        // Live hosts count cell
+                        const liveHostsCell = document.createElement('td');
+                        liveHostsCell.textContent = scan.live_hosts_count;
+
+                        // Actions cell
+                        const actionsCell = document.createElement('td');
+                        const viewButton = document.createElement('button');
+                        viewButton.textContent = 'View Details';
+                        viewButton.className = 'view-button-sm';
+                        viewButton.onclick = function() {
+                            window.location.href = `/scan/scan-details/${scan.id}`;
+                        };
+                        actionsCell.appendChild(viewButton);
+
+                        // Add cells to row
+                        row.appendChild(domainCell);
+                        row.appendChild(dateCell);
+                        row.appendChild(subdomainsCell);
+                        row.appendChild(liveHostsCell);
+                        row.appendChild(actionsCell);
+
+                        recentScansTable.appendChild(row);
+                    });
+
+                    // Add a "View All" link
+                    const viewAllRow = document.createElement('tr');
+                    const viewAllCell = document.createElement('td');
+                    viewAllCell.colSpan = 5;
+                    viewAllCell.className = 'view-all';
+                    const viewAllLink = document.createElement('a');
+                    viewAllLink.href = '/history';
+                    viewAllLink.textContent = 'View All Scans';
+                    viewAllCell.appendChild(viewAllLink);
+                    viewAllRow.appendChild(viewAllCell);
+                    recentScansTable.appendChild(viewAllRow);
+                })
+                .catch(error => {
+                    console.error('Error loading recent scans:', error);
+                    recentScansTable.innerHTML = '<tr><th>Domain</th><th>Date</th><th>Subdomains</th><th>Live Hosts</th><th>Actions</th></tr>';
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 5;
+                    cell.className = 'error';
+                    cell.textContent = 'Error loading recent scans';
+                    row.appendChild(cell);
+                    recentScansTable.appendChild(row);
+                });
+            }
+
+            // Function to check tools status
+            function checkToolsStatus() {
+                fetch('/api/tools')
+                .then(response => response.json())
+                .then(data => {
+                    // Update each tool status
+                    for (const tool in data) {
+                        const available = data[tool];
+                        const toolItems = toolsStatus.querySelectorAll('.tool-item');
+
+                        for (const item of toolItems) {
+                            const nameSpan = item.querySelector('.tool-name');
+                            if (nameSpan && nameSpan.textContent.toLowerCase() === tool.toLowerCase()) {
+                                const statusSpan = item.querySelector('.tool-status');
+                                statusSpan.classList.remove('loading');
+                                if (available) {
+                                    statusSpan.textContent = 'Available';
+                                    statusSpan.classList.add('available');
+                                } else {
+                                    statusSpan.textContent = 'Not Available';
+                                    statusSpan.classList.add('not-available');
+                                }
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking tools status:', error);
+                    // Update all tool statuses to error
+                    const statusSpans = toolsStatus.querySelectorAll('.tool-status');
+                    statusSpans.forEach(span => {
+                        span.classList.remove('loading');
+                        span.textContent = 'Error';
+                        span.classList.add('error');
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
