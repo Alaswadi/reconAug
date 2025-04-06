@@ -367,44 +367,97 @@ def get_historical_urls(domain):
 
         print(f"Running GAU for domain: {domain} (base domain: {base_domain})")
 
-        # Run gau command with increased threads and timeout
+        # Create a temporary file to store the output
+        temp_output_file = f"output/temp_gau_{domain}.txt"
+
+        # Use a more reliable approach - write to file directly
         try:
             # First try with the exact domain
+            print(f"Running GAU command: gau --threads 50 --o {temp_output_file} {domain}")
             process = subprocess.run(
-                ['gau', '--threads', '50', '--timeout', '60', domain],
+                ['gau', '--threads', '50', '-o', temp_output_file, domain],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
                 text=True,
-                timeout=120  # 2 minute timeout for the entire process
+                timeout=180  # 3 minute timeout for the entire process
             )
 
-            # Parse the output directly from stdout
+            # Check if the output file exists and has content
             urls = []
-            if process.stdout:
-                urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+            if os.path.exists(temp_output_file):
+                with open(temp_output_file, 'r') as f:
+                    urls = [line.strip() for line in f if line.strip()]
+
+                # Move the temp file to the final output file
+                os.rename(temp_output_file, output_file)
+            else:
+                print(f"GAU output file not found: {temp_output_file}")
+
+                # Check stderr for errors
+                if process.stderr:
+                    print(f"GAU stderr: {process.stderr}")
 
             # If no results and domain starts with www, try without www
             if len(urls) == 0 and domain.startswith('www.'):
                 print(f"No results found for {domain}, trying {base_domain}")
+
+                # Try again with the base domain
+                print(f"Running GAU command: gau --threads 50 --o {temp_output_file} {base_domain}")
                 process = subprocess.run(
-                    ['gau', '--threads', '50', '--timeout', '60', base_domain],
+                    ['gau', '--threads', '50', '-o', temp_output_file, base_domain],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     check=False,
                     text=True,
-                    timeout=120  # 2 minute timeout for the entire process
+                    timeout=180  # 3 minute timeout for the entire process
                 )
 
-                if process.stdout:
-                    urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+                # Check if the output file exists and has content
+                if os.path.exists(temp_output_file):
+                    with open(temp_output_file, 'r') as f:
+                        urls = [line.strip() for line in f if line.strip()]
 
-            # Save to file for reference
-            with open(output_file, 'w') as f:
-                for url in urls:
-                    f.write(f"{url}\n")
+                    # Move the temp file to the final output file
+                    os.rename(temp_output_file, output_file)
+                else:
+                    print(f"GAU output file not found: {temp_output_file}")
 
-            print(f"GAU found {len(urls)} URLs for {domain}")
+                    # Check stderr for errors
+                    if process.stderr:
+                        print(f"GAU stderr: {process.stderr}")
+
+            # If still no results, try using the waybackurls tool as a fallback
+            if len(urls) == 0:
+                print(f"No results found with GAU, trying alternative method...")
+
+                # Try using curl to fetch from the Wayback Machine API directly
+                wayback_url = f"http://web.archive.org/cdx/search/cdx?url=*.{base_domain}/*&output=json&fl=original&collapse=urlkey"
+                print(f"Fetching URLs from Wayback Machine API: {wayback_url}")
+
+                try:
+                    response = requests.get(wayback_url, timeout=60)
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            # Skip the header row
+                            if len(data) > 1:
+                                for row in data[1:]:
+                                    if row and row[0]:
+                                        urls.append(row[0])
+
+                                # Save to file
+                                with open(output_file, 'w') as f:
+                                    for url in urls:
+                                        f.write(f"{url}\n")
+                        except Exception as e:
+                            print(f"Error parsing Wayback Machine response: {e}")
+                    else:
+                        print(f"Wayback Machine API returned status code: {response.status_code}")
+                except Exception as e:
+                    print(f"Error fetching from Wayback Machine API: {e}")
+
+            print(f"Found {len(urls)} URLs for {domain}")
             return urls, None
         except subprocess.TimeoutExpired:
             print(f"GAU timed out for {domain}")
@@ -739,27 +792,6 @@ def run_gau():
 
     print(f"Found {len(urls)} historical URLs for {domain}")
 
-    # If we have no results, try with a different domain format
-    if len(urls) == 0:
-        # If domain starts with www, try without it
-        if domain.startswith('www.'):
-            base_domain = domain[4:]
-            print(f"No results found for {domain}, trying {base_domain}")
-            urls, error = get_historical_urls(base_domain)
-            if error:
-                print(f"Error running GAU for {base_domain}: {error}")
-            else:
-                print(f"Found {len(urls)} historical URLs for {base_domain}")
-        # If domain doesn't start with www, try with it
-        else:
-            www_domain = f"www.{domain}"
-            print(f"No results found for {domain}, trying {www_domain}")
-            urls, error = get_historical_urls(www_domain)
-            if error:
-                print(f"Error running GAU for {www_domain}: {error}")
-            else:
-                print(f"Found {len(urls)} historical URLs for {www_domain}")
-
     # Try to find the most recent scan for this domain to associate the URLs with
     if len(urls) > 0:
         try:
@@ -801,10 +833,18 @@ def run_gau():
             import traceback
             traceback.print_exc()
 
+    # Limit the number of URLs returned to the frontend to avoid overwhelming the browser
+    max_urls_to_return = 1000
+    urls_to_return = urls[:max_urls_to_return] if len(urls) > max_urls_to_return else urls
+
+    if len(urls) > max_urls_to_return:
+        print(f"Limiting returned URLs from {len(urls)} to {max_urls_to_return}")
+
     return jsonify({
         'domain': domain,
         'count': len(urls),
-        'urls': urls
+        'urls': urls_to_return,
+        'limited': len(urls) > max_urls_to_return
     })
 
 @app.route('/scan-ports', methods=['GET'])

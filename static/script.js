@@ -29,7 +29,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let fullResults = {
         liveHosts: [],
         subdomains: [],
-        historicalUrls: {}
+        historicalUrls: {},
+        historicalUrlsCount: {},
+        historicalUrlsLimited: {}
     };
 
     // Track GAU loading status
@@ -81,6 +83,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 fullResults.liveHosts = data.live_hosts || [];
                 fullResults.subdomains = data.subdomains || [];
                 fullResults.historicalUrls = {}; // Reset historical URLs
+                fullResults.historicalUrlsCount = {}; // Reset counts
+                fullResults.historicalUrlsLimited = {}; // Reset limited flags
 
                 // Update the UI
                 resultDomain.textContent = data.domain;
@@ -403,6 +407,17 @@ document.addEventListener('DOMContentLoaded', function() {
             headerCell.textContent = `Historical URLs for ${domain}`;
             headerRow.appendChild(headerCell);
             historicalUrlsTable.appendChild(headerRow);
+
+            // Add note if results are limited
+            if (fullResults.historicalUrlsLimited && fullResults.historicalUrlsLimited[domain]) {
+                const limitRow = document.createElement('tr');
+                const limitCell = document.createElement('td');
+                limitCell.colSpan = 2;
+                limitCell.classList.add('limit-note');
+                limitCell.innerHTML = `<strong>Note:</strong> Showing ${urls.length} of ${fullResults.historicalUrlsCount[domain]} total URLs. The complete list is saved in the database.`;
+                limitRow.appendChild(limitCell);
+                historicalUrlsTable.appendChild(limitRow);
+            }
         }
 
         if (!urls || urls.length === 0) {
@@ -466,6 +481,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             // Store the results
             fullResults.historicalUrls[domain] = data.urls || [];
+            fullResults.historicalUrlsCount = fullResults.historicalUrlsCount || {};
+            fullResults.historicalUrlsCount[domain] = data.count || 0;
+            fullResults.historicalUrlsLimited = fullResults.historicalUrlsLimited || {};
+            fullResults.historicalUrlsLimited[domain] = data.limited || false;
 
             // Update button
             button.disabled = false;
@@ -474,7 +493,11 @@ document.addEventListener('DOMContentLoaded', function() {
             gauLoading[domain] = false;
 
             // Show a notification
-            alert(`Found ${data.urls.length} historical URLs for ${domain}`);
+            let message = `Found ${data.count} historical URLs for ${domain}`;
+            if (data.limited) {
+                message += ` (showing ${data.urls.length} in the UI)`;
+            }
+            alert(message);
         })
         .catch(error => {
             console.error('Error:', error);
