@@ -73,4 +73,4 @@ RUN mkdir -p output
 EXPOSE 5001
 
 # Run the application
-CMD ["python", "app.py"]
+CMD ["python", "new_app.py"]
