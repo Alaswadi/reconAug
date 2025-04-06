@@ -360,27 +360,57 @@ def get_historical_urls(domain):
         if not tools['gau']:
             return [], "GAU tool is not installed"
 
-        # Run gau command with increased threads
-        process = subprocess.run(
-            ['gau', '--threads', '50', domain],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True
-        )
+        # Extract the base domain (remove www. if present)
+        base_domain = domain
+        if domain.startswith('www.'):
+            base_domain = domain[4:]
 
-        # Parse the output directly from stdout
-        urls = []
-        if process.stdout:
-            urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+        print(f"Running GAU for domain: {domain} (base domain: {base_domain})")
+
+        # Run gau command with increased threads and timeout
+        try:
+            # First try with the exact domain
+            process = subprocess.run(
+                ['gau', '--threads', '50', '--timeout', '60', domain],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                text=True,
+                timeout=120  # 2 minute timeout for the entire process
+            )
+
+            # Parse the output directly from stdout
+            urls = []
+            if process.stdout:
+                urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+
+            # If no results and domain starts with www, try without www
+            if len(urls) == 0 and domain.startswith('www.'):
+                print(f"No results found for {domain}, trying {base_domain}")
+                process = subprocess.run(
+                    ['gau', '--threads', '50', '--timeout', '60', base_domain],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                    text=True,
+                    timeout=120  # 2 minute timeout for the entire process
+                )
+
+                if process.stdout:
+                    urls = [line.strip() for line in process.stdout.splitlines() if line.strip()]
 
             # Save to file for reference
             with open(output_file, 'w') as f:
                 for url in urls:
                     f.write(f"{url}\n")
 
-        return urls, None
+            print(f"GAU found {len(urls)} URLs for {domain}")
+            return urls, None
+        except subprocess.TimeoutExpired:
+            print(f"GAU timed out for {domain}")
+            return [], "GAU process timed out"
     except (FileNotFoundError, subprocess.SubprocessError) as e:
+        print(f"Error running GAU: {e}")
         return [], str(e)
 
 def check_ports(host):
@@ -709,33 +739,67 @@ def run_gau():
 
     print(f"Found {len(urls)} historical URLs for {domain}")
 
-    # Try to find the most recent scan for this domain to associate the URLs with
-    try:
-        # Use application context for database operations
-        with app.app_context():
-            scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
-            if scan:
-                print(f"Found scan ID {scan.id} for domain {domain}")
-                # Check if we already have historical URLs for this scan
-                existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
-                if existing_urls == 0:
-                    print(f"No existing historical URLs for scan ID {scan.id}, saving {len(urls)} URLs")
-                    # Save historical URLs to database
-                    for url in urls:
-                        db.session.add(HistoricalUrl(
-                            scan_id=scan.id,
-                            url=url
-                        ))
-                    db.session.commit()
-                    print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
-                else:
-                    print(f"Found {existing_urls} existing historical URLs for scan ID {scan.id}, skipping")
+    # If we have no results, try with a different domain format
+    if len(urls) == 0:
+        # If domain starts with www, try without it
+        if domain.startswith('www.'):
+            base_domain = domain[4:]
+            print(f"No results found for {domain}, trying {base_domain}")
+            urls, error = get_historical_urls(base_domain)
+            if error:
+                print(f"Error running GAU for {base_domain}: {error}")
             else:
-                print(f"No scan found for domain {domain}")
-    except Exception as e:
-        print(f"Error saving historical URLs to database: {e}")
-        import traceback
-        traceback.print_exc()
+                print(f"Found {len(urls)} historical URLs for {base_domain}")
+        # If domain doesn't start with www, try with it
+        else:
+            www_domain = f"www.{domain}"
+            print(f"No results found for {domain}, trying {www_domain}")
+            urls, error = get_historical_urls(www_domain)
+            if error:
+                print(f"Error running GAU for {www_domain}: {error}")
+            else:
+                print(f"Found {len(urls)} historical URLs for {www_domain}")
+
+    # Try to find the most recent scan for this domain to associate the URLs with
+    if len(urls) > 0:
+        try:
+            # Use application context for database operations
+            with app.app_context():
+                # Try exact domain match first
+                scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
+
+                # If no scan found and domain starts with www, try without www
+                if not scan and domain.startswith('www.'):
+                    base_domain = domain[4:]
+                    scan = Scan.query.filter_by(domain=base_domain).order_by(Scan.timestamp.desc()).first()
+
+                # If no scan found and domain doesn't start with www, try with www
+                if not scan and not domain.startswith('www.'):
+                    www_domain = f"www.{domain}"
+                    scan = Scan.query.filter_by(domain=www_domain).order_by(Scan.timestamp.desc()).first()
+
+                if scan:
+                    print(f"Found scan ID {scan.id} for domain {scan.domain}")
+                    # Check if we already have historical URLs for this scan
+                    existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
+                    if existing_urls == 0:
+                        print(f"No existing historical URLs for scan ID {scan.id}, saving {len(urls)} URLs")
+                        # Save historical URLs to database
+                        for url in urls:
+                            db.session.add(HistoricalUrl(
+                                scan_id=scan.id,
+                                url=url
+                            ))
+                        db.session.commit()
+                        print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+                    else:
+                        print(f"Found {existing_urls} existing historical URLs for scan ID {scan.id}, skipping")
+                else:
+                    print(f"No scan found for domain {domain} or its variations")
+        except Exception as e:
+            print(f"Error saving historical URLs to database: {e}")
+            import traceback
+            traceback.print_exc()
 
     return jsonify({
         'domain': domain,
