@@ -185,7 +185,7 @@
                 this.disabled = true;
 
                 // Fetch ports data
-                fetch(`/host/${hostId}/ports`)
+                fetch(`/api/host/${hostId}/ports`)
                     .then(response => response.json())
                     .then(data => {
                         // Reset button

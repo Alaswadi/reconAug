@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('domain', domain);
 
-        fetch('/scan', {
+        fetch('/scan/scan', {
             method: 'POST',
             body: formData
         })

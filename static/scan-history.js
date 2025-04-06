@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create a form to submit the domain
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/scan';
+        form.action = '/scan/scan';
 
         const input = document.createElement('input');
         input.type = 'hidden';
