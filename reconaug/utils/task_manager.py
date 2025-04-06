@@ -7,7 +7,7 @@ class TaskManager:
     def __init__(self):
         self.tasks = {}
         self.task_lock = threading.Lock()
-    
+
     def create_task(self, domain):
         """Create a new task for domain scanning"""
         task_id = str(uuid.uuid4())
@@ -18,11 +18,13 @@ class TaskManager:
                 'progress': 0,
                 'message': 'Initializing...',
                 'timestamp': time.time(),
-                'complete': False
+                'complete': False,
+                'subdomains_count': 0,
+                'live_hosts_count': 0
             }
         return task_id
-    
-    def update_task(self, task_id, status=None, progress=None, message=None, complete=None):
+
+    def update_task(self, task_id, status=None, progress=None, message=None, complete=None, subdomains_count=None, live_hosts_count=None):
         """Update task status"""
         with self.task_lock:
             if task_id in self.tasks:
@@ -34,13 +36,17 @@ class TaskManager:
                     self.tasks[task_id]['message'] = message
                 if complete is not None:
                     self.tasks[task_id]['complete'] = complete
+                if subdomains_count is not None:
+                    self.tasks[task_id]['subdomains_count'] = subdomains_count
+                if live_hosts_count is not None:
+                    self.tasks[task_id]['live_hosts_count'] = live_hosts_count
                 self.tasks[task_id]['timestamp'] = time.time()
-    
+
     def get_task(self, task_id):
         """Get task status"""
         with self.task_lock:
             return self.tasks.get(task_id, {}).copy()
-    
+
     def clean_old_tasks(self, max_age=3600):
         """Clean up old tasks (older than max_age seconds)"""
         current_time = time.time()
@@ -58,7 +64,7 @@ def start_cleanup_thread():
         while True:
             task_manager.clean_old_tasks()
             time.sleep(300)  # Clean up every 5 minutes
-    
+
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
 

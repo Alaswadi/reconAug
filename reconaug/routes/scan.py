@@ -145,7 +145,9 @@ def run_scan_in_background(domain, task_id, app):
         task_manager.update_task(
             task_id,
             progress=50,
-            message=f'Found {len(all_domains)} unique subdomains. Checking live hosts...'
+            message=f'Found {len(all_domains)} unique subdomains. Checking live hosts...',
+            subdomains_count=len(all_domains),
+            live_hosts_count=0
         )
 
         # Check which domains are live
@@ -155,7 +157,9 @@ def run_scan_in_background(domain, task_id, app):
         task_manager.update_task(
             task_id,
             progress=80,
-            message=f'Found {len(live_hosts)} live hosts'
+            message=f'Found {len(live_hosts)} live hosts',
+            subdomains_count=len(all_domains),
+            live_hosts_count=len(live_hosts)
         )
 
         # Save results to database
@@ -185,6 +189,8 @@ def run_scan_in_background(domain, task_id, app):
             status='complete',
             progress=100,
             message=f'Scan complete. Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts. {db_message}',
+            subdomains_count=len(all_domains),
+            live_hosts_count=len(live_hosts),
             complete=True
         )
         print(f"Task {task_id} marked as complete")

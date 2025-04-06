@@ -251,14 +251,19 @@ def task_events(task_id):
                 yield f"data: {{'error': 'Task not found'}}\\n\\n"
                 break
 
-            # Only send updates if the status has changed
+            # Always send updates to ensure client gets the latest data
             current_status = f"{task['status']}-{task['progress']}-{task['message']}"
-            if current_status != last_status:
+            if current_status != last_status or counter % 5 == 0:  # Send update if status changed or every 5 seconds
                 print(f"Sending SSE update for task {task_id}: {current_status}")
-                data_json = f"data: {{'status': '{task['status']}', 'progress': {task['progress']}, 'message': '{task['message']}', 'complete': {str(task['complete']).lower()}}}\\n\\n"
+
+                # Include subdomains_count and live_hosts_count if available
+                subdomains_count = task.get('subdomains_count', 0)
+                live_hosts_count = task.get('live_hosts_count', 0)
+
+                data_json = f"data: {{'status': '{task['status']}', 'progress': {task['progress']}, 'message': '{task['message']}', 'complete': {str(task['complete']).lower()}, 'subdomains_count': {subdomains_count}, 'live_hosts_count': {live_hosts_count}}}\\n\\n"
                 yield data_json
                 last_status = current_status
-                print(f"SSE update sent for task {task_id}")
+                print(f"SSE update sent for task {task_id} with subdomains: {subdomains_count}, live hosts: {live_hosts_count}")
 
             # If the task is complete, stop sending updates
             if task['complete']:
