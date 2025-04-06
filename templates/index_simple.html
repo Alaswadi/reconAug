@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReconAug Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        h1 {
+            color: #4CAF50;
+            margin: 0;
+        }
+        
+        nav a {
+            margin-left: 15px;
+            text-decoration: none;
+            color: #333;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card h2 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #4CAF50;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ReconAug Dashboard</h1>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/history">Scan History</a>
+            </nav>
+        </header>
+        
+        <div class="card">
+            <h2>New Scan</h2>
+            <p>Enter a domain to start a new reconnaissance scan.</p>
+            <form id="scanForm">
+                <div class="form-group">
+                    <input type="text" id="domain" name="domain" placeholder="Enter domain (e.g., example.com)" required>
+                </div>
+                <button type="submit" id="scanButton">Start Scan</button>
+            </form>
+        </div>
+        
+        <div id="loading">
+            <div class="spinner"></div>
+            <p id="loadingMessage">Starting scan...</p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scanForm = document.getElementById('scanForm');
+            const scanButton = document.getElementById('scanButton');
+            const domainInput = document.getElementById('domain');
+            const loading = document.getElementById('loading');
+            const loadingMessage = document.getElementById('loadingMessage');
+            
+            scanForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const domain = domainInput.value.trim();
+                if (!domain) {
+                    alert('Please enter a domain');
+                    return;
+                }
+                
+                // Show loading
+                scanButton.disabled = true;
+                loading.style.display = 'block';
+                loadingMessage.textContent = `Starting scan for ${domain}...`;
+                
+                // Submit the form
+                fetch('/scan/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `domain=${encodeURIComponent(domain)}`
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Scan started:', data);
+                    
+                    // Reset form
+                    scanButton.disabled = false;
+                    loading.style.display = 'none';
+                    
+                    // Redirect to the scan progress page
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else if (data.task_id) {
+                        window.location.href = `/scan/progress/${data.task_id}`;
+                    } else {
+                        alert('Scan started successfully, but no task ID was returned.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting scan:', error);
+                    scanButton.disabled = false;
+                    loading.style.display = 'none';
+                    alert('An error occurred while starting the scan. Please try again.');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

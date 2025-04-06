@@ -263,16 +263,30 @@
                 .then(response => response.json())
                 .then(data => {
                     // Update each tool status
-                    for (const tool in data) {
-                        const available = data[tool];
-                        const toolItems = toolsStatus.querySelectorAll('.tool-item');
+                    // Get all tool items
+                    const toolItems = toolsStatus.querySelectorAll('.tool-item');
 
-                        for (const item of toolItems) {
-                            const nameSpan = item.querySelector('.tool-name');
-                            if (nameSpan && nameSpan.textContent.toLowerCase() === tool.toLowerCase()) {
-                                const statusSpan = item.querySelector('.tool-status');
+                    // Loop through each tool item
+                    toolItems.forEach(item => {
+                        const nameSpan = item.querySelector('.tool-name');
+                        const statusSpan = item.querySelector('.tool-status');
+
+                        if (nameSpan && statusSpan) {
+                            const toolName = nameSpan.textContent.toLowerCase();
+
+                            // Convert tool name to match API response keys
+                            let apiKey = toolName;
+                            if (toolName === 'subfinder') apiKey = 'subfinder';
+                            else if (toolName === 'httpx') apiKey = 'httpx';
+                            else if (toolName === 'gau') apiKey = 'gau';
+                            else if (toolName === 'naabu') apiKey = 'naabu';
+                            else if (toolName === 'chaos api') apiKey = 'chaos_api';
+                            else if (toolName === 'sublist3r') apiKey = 'sublist3r';
+
+                            // Update status if the tool is in the API response
+                            if (apiKey in data) {
                                 statusSpan.classList.remove('loading');
-                                if (available) {
+                                if (data[apiKey]) {
                                     statusSpan.textContent = 'Available';
                                     statusSpan.classList.add('available');
                                 } else {
@@ -281,7 +295,7 @@
                                 }
                             }
                         }
-                    }
+                    });
                 })
                 .catch(error => {
                     console.error('Error checking tools status:', error);

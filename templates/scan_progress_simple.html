@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Progress - ReconAug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        h1 {
+            color: #4CAF50;
+            margin: 0;
+        }
+        
+        nav a {
+            margin-left: 15px;
+            text-decoration: none;
+            color: #333;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card h2 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+        }
+        
+        .progress-bar-container {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-message {
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-item {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            flex: 1;
+        }
+        
+        .stat-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .tab-button {
+            padding: 10px 15px;
+            background-color: #f0f0f0;
+            border: none;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .tab-content {
+            background-color: white;
+            padding: 15px;
+            border-radius: 0 0 5px 5px;
+        }
+        
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f0f0f0;
+        }
+        
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .button:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Scan Progress</h1>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/history">Scan History</a>
+            </nav>
+        </header>
+        
+        <div class="card">
+            <h2>Scan Details</h2>
+            <p><strong>Domain:</strong> <span id="domainValue">{{ domain }}</span></p>
+            <p><strong>Task ID:</strong> <span id="taskIdValue">{{ task_id }}</span></p>
+            
+            <div class="progress-container">
+                <h3>Progress</h3>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-message" id="progressMessage">Initializing scan...</div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Subdomains Found</div>
+                        <div class="stat-value" id="subdomainsCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Live Hosts Found</div>
+                        <div class="stat-value" id="liveHostsCount">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="results" id="resultsContainer">
+                <h3>Results</h3>
+                
+                <div class="tabs">
+                    <button class="tab-button active" data-tab="subdomainsTab">Subdomains</button>
+                    <button class="tab-button" data-tab="liveHostsTab">Live Hosts</button>
+                </div>
+                
+                <div class="tab-content">
+                    <div class="tab-pane active" id="subdomainsTab">
+                        <input type="text" id="subdomainsFilter" placeholder="Filter subdomains..." style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        <table id="subdomainsTable">
+                            <thead>
+                                <tr>
+                                    <th>Subdomain</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>No subdomains found yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="tab-pane" id="liveHostsTab">
+                        <input type="text" id="liveHostsFilter" placeholder="Filter live hosts..." style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                        <table id="liveHostsTable">
+                            <thead>
+                                <tr>
+                                    <th>URL</th>
+                                    <th>Status</th>
+                                    <th>Technology</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="4">No live hosts found yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <a href="/" class="button">New Scan</a>
+                <a href="/history" class="button">View History</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const progressBar = document.getElementById('progressBar');
+            const progressMessage = document.getElementById('progressMessage');
+            const subdomainsCount = document.getElementById('subdomainsCount');
+            const liveHostsCount = document.getElementById('liveHostsCount');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const subdomainsTable = document.getElementById('subdomainsTable').querySelector('tbody');
+            const liveHostsTable = document.getElementById('liveHostsTable').querySelector('tbody');
+            const subdomainsFilter = document.getElementById('subdomainsFilter');
+            const liveHostsFilter = document.getElementById('liveHostsFilter');
+            
+            // Tab elements
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            // Task ID
+            const taskId = '{{ task_id }}';
+            
+            // Store the full results
+            let fullResults = {
+                subdomains: [],
+                liveHosts: []
+            };
+            
+            // Set up event source for real-time updates
+            let eventSource = new EventSource(`/api/task/${taskId}/events`);
+            
+            // Listen for messages
+            eventSource.onmessage = function(event) {
+                console.log('SSE message received:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Parsed SSE data:', data);
+                    updateProgress(data);
+                } catch (error) {
+                    console.error('Error parsing SSE data:', error);
+                    console.error('Raw event data:', event.data);
+                }
+            };
+            
+            // Handle errors
+            eventSource.onerror = function(error) {
+                console.error('EventSource error:', error);
+                eventSource.close();
+            };
+            
+            // Function to update the progress UI
+            function updateProgress(data) {
+                console.log('Updating progress UI with data:', data);
+                
+                // Update progress bar
+                if (data.progress !== undefined) {
+                    progressBar.style.width = `${data.progress}%`;
+                }
+                
+                // Update message
+                if (data.message !== undefined) {
+                    progressMessage.textContent = data.message;
+                }
+                
+                // Update subdomains count if available
+                if (data.subdomains_count !== undefined) {
+                    subdomainsCount.textContent = data.subdomains_count;
+                }
+                
+                // Update live hosts count if available
+                if (data.live_hosts_count !== undefined) {
+                    liveHostsCount.textContent = data.live_hosts_count;
+                }
+                
+                // If the task is complete, show the results
+                if (data.status === 'complete') {
+                    console.log('Task complete, showing results');
+                    
+                    // Store the results
+                    if (data.subdomains) {
+                        fullResults.subdomains = data.subdomains;
+                    }
+                    if (data.live_hosts) {
+                        fullResults.liveHosts = data.live_hosts;
+                    }
+                    
+                    // Populate the tables
+                    populateSubdomainsTable(fullResults.subdomains);
+                    populateLiveHostsTable(fullResults.liveHosts);
+                    
+                    // Show the results container
+                    resultsContainer.style.display = 'block';
+                    
+                    // Close the event source
+                    eventSource.close();
+                } else if (data.status === 'error') {
+                    console.error('Task error:', data.message);
+                    progressMessage.textContent = `Error: ${data.message}`;
+                    progressMessage.style.color = 'red';
+                    
+                    // Close the event source
+                    eventSource.close();
+                }
+            }
+            
+            // Function to populate the subdomains table
+            function populateSubdomainsTable(subdomains) {
+                // Clear the table
+                subdomainsTable.innerHTML = '';
+                
+                if (!subdomains || subdomains.length === 0) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.textContent = 'No subdomains found';
+                    row.appendChild(cell);
+                    subdomainsTable.appendChild(row);
+                    return;
+                }
+                
+                // Add each subdomain to the table
+                subdomains.forEach(subdomain => {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.textContent = subdomain;
+                    row.appendChild(cell);
+                    subdomainsTable.appendChild(row);
+                });
+            }
+            
+            // Function to populate the live hosts table
+            function populateLiveHostsTable(liveHosts) {
+                // Clear the table
+                liveHostsTable.innerHTML = '';
+                
+                if (!liveHosts || liveHosts.length === 0) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 4;
+                    cell.textContent = 'No live hosts found';
+                    row.appendChild(cell);
+                    liveHostsTable.appendChild(row);
+                    return;
+                }
+                
+                // Add each live host to the table
+                liveHosts.forEach(host => {
+                    const row = document.createElement('tr');
+                    
+                    // URL cell
+                    const urlCell = document.createElement('td');
+                    const urlLink = document.createElement('a');
+                    urlLink.href = host.url;
+                    urlLink.textContent = host.url;
+                    urlLink.target = '_blank';
+                    urlCell.appendChild(urlLink);
+                    
+                    // Status code cell
+                    const statusCell = document.createElement('td');
+                    statusCell.textContent = host.status_code;
+                    
+                    // Add color based on status code
+                    if (host.status_code.startsWith('2')) {
+                        statusCell.style.color = '#4CAF50';
+                    } else if (host.status_code.startsWith('3')) {
+                        statusCell.style.color = '#2196F3';
+                    } else if (host.status_code.startsWith('4') || host.status_code.startsWith('5')) {
+                        statusCell.style.color = '#f44336';
+                    }
+                    
+                    // Technology cell
+                    const techCell = document.createElement('td');
+                    techCell.textContent = host.technology || 'Unknown';
+                    
+                    // Actions cell
+                    const actionsCell = document.createElement('td');
+                    
+                    // GAU button
+                    const gauButton = document.createElement('button');
+                    gauButton.textContent = 'Run GAU';
+                    gauButton.style.marginRight = '5px';
+                    gauButton.onclick = function() {
+                        runGau(host.url, this);
+                    };
+                    
+                    // Port scan button
+                    const portScanButton = document.createElement('button');
+                    portScanButton.textContent = 'Scan Ports';
+                    portScanButton.onclick = function() {
+                        scanPorts(host.url, this);
+                    };
+                    
+                    actionsCell.appendChild(gauButton);
+                    actionsCell.appendChild(portScanButton);
+                    
+                    // Add cells to row
+                    row.appendChild(urlCell);
+                    row.appendChild(statusCell);
+                    row.appendChild(techCell);
+                    row.appendChild(actionsCell);
+                    
+                    liveHostsTable.appendChild(row);
+                });
+            }
+            
+            // Function to run GAU for a specific domain
+            function runGau(domain, button) {
+                // Update button state
+                button.disabled = true;
+                button.textContent = 'Loading...';
+                
+                // Make AJAX request to run GAU
+                fetch(`/api/run-gau?domain=${encodeURIComponent(domain)}`, {
+                    method: 'GET'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update button
+                    button.disabled = false;
+                    button.textContent = 'Run GAU';
+                    
+                    // Show a notification
+                    alert(`Started GAU task for ${domain}. Task ID: ${data.task_id}`);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    button.disabled = false;
+                    button.textContent = 'Run GAU (Failed)';
+                });
+            }
+            
+            // Function to scan ports for a specific host
+            function scanPorts(host, button) {
+                // Update button state
+                button.disabled = true;
+                button.textContent = 'Loading...';
+                
+                // Make AJAX request to scan ports
+                fetch(`/api/scan-ports?host=${encodeURIComponent(host)}`, {
+                    method: 'GET'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update button
+                    button.disabled = false;
+                    button.textContent = 'Scan Ports';
+                    
+                    // Show a notification
+                    alert(`Started port scan task for ${host}. Task ID: ${data.task_id}`);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    button.disabled = false;
+                    button.textContent = 'Scan Ports (Failed)';
+                });
+            }
+            
+            // Filter subdomains
+            subdomainsFilter.addEventListener('input', function() {
+                const filterValue = this.value.toLowerCase();
+                const rows = subdomainsTable.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const subdomain = row.querySelector('td')?.textContent.toLowerCase();
+                    if (subdomain && subdomain.includes(filterValue)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+            
+            // Filter live hosts
+            liveHostsFilter.addEventListener('input', function() {
+                const filterValue = this.value.toLowerCase();
+                const rows = liveHostsTable.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const url = row.querySelector('td:first-child a')?.textContent.toLowerCase();
+                    const status = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase();
+                    const tech = row.querySelector('td:nth-child(3)')?.textContent.toLowerCase();
+                    
+                    if ((url && url.includes(filterValue)) || 
+                        (status && status.includes(filterValue)) || 
+                        (tech && tech.includes(filterValue))) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+            
+            // Tab switching
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons and panes
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabPanes.forEach(pane => pane.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding pane
+                    this.classList.add('active');
+                    const tabId = this.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Check task status on load
+            fetch(`/api/debug/task/${taskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Task status:', data);
+                })
+                .catch(error => {
+                    console.error('Error checking task status:', error);
+                });
+        });
+    </script>
+</body>
+</html>

@@ -64,8 +64,15 @@ def scan_progress_page(task_id):
         domain = ""
         if task.state == 'SUCCESS' and task.result:
             domain = task.result.get('domain', '')
+        elif task.state == 'PENDING':
+            print(f"Task {task_id} is pending")
+        elif task.state == 'FAILURE':
+            print(f"Task {task_id} failed: {task.info}")
+        elif task.info:
+            domain = task.info.get('domain', '')
 
-        return render_template('scan_progress.html', task_id=task_id, domain=domain)
+        print(f"Rendering scan progress page for task {task_id}, domain: {domain}")
+        return render_template('scan_progress_simple.html', task_id=task_id, domain=domain)
     except Exception as e:
         print(f"Error rendering scan progress page: {e}")
         import traceback
