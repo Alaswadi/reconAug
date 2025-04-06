@@ -38,10 +38,13 @@ def scan():
         task_id = task_manager.create_task(domain)
         print(f"Created task with ID: {task_id}")
 
+        # Get the current application object
+        app = current_app._get_current_object()
+
         # Start the scan in a background thread
         scan_thread = threading.Thread(
             target=run_scan_in_background,
-            args=(domain, task_id)
+            args=(domain, task_id, app)
         )
         scan_thread.daemon = True
         scan_thread.start()
@@ -91,14 +94,11 @@ def scan_details_page(scan_id):
         traceback.print_exc()
         return f"Error: {str(e)}", 500
 
-def run_scan_in_background(domain, task_id):
+def run_scan_in_background(domain, task_id, app):
     """Run the scan in a background thread"""
     try:
         # Create output directory if it doesn't exist
         os.makedirs('output', exist_ok=True)
-
-        # Get the current application context
-        app = current_app._get_current_object()
 
         # Clean up any existing output files
         for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",

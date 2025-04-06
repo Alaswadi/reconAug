@@ -100,11 +100,8 @@ def run_gau():
     # Try to find the most recent scan for this domain to associate the URLs with
     if len(urls) > 0:
         try:
-            # Get the current application context
-            app = current_app._get_current_object()
-
             # Use application context for database operations
-            with app.app_context():
+            with current_app.app_context():
                 # Try exact domain match first
                 scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
 
@@ -177,11 +174,8 @@ def scan_ports_api():
 
     # Save port scan results to database
     try:
-        # Get the current application context
-        app = current_app._get_current_object()
-
         # Use application context for database operations
-        with app.app_context():
+        with current_app.app_context():
             success = save_ports_to_database(host, ports)
             if success:
                 print(f"Saved {len(ports)} ports to database for host {host}")
