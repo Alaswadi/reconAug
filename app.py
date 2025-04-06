@@ -924,8 +924,8 @@ def scan_history():
 
 # Route to get scan details
 @app.route('/scan/<int:scan_id>')
-def scan_details(scan_id):
-    """Get details of a specific scan"""
+def scan_details_api(scan_id):
+    """API endpoint to get details of a specific scan"""
     try:
         scan = Scan.query.get_or_404(scan_id)
         subdomains = [s.name for s in scan.subdomains]
@@ -938,6 +938,30 @@ def scan_details(scan_id):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/scan-details/<int:scan_id>')
+def scan_details_page(scan_id):
+    """Page to display details of a specific scan"""
+    try:
+        scan = Scan.query.get_or_404(scan_id)
+        subdomains = [s.name for s in scan.subdomains]
+        live_hosts = [h.to_dict() for h in scan.live_hosts]
+
+        # Get historical URLs
+        historical_urls = [h.url for h in HistoricalUrl.query.filter_by(scan_id=scan_id).all()]
+
+        return render_template(
+            'scan_details.html',
+            scan=scan,
+            subdomains=subdomains,
+            live_hosts=live_hosts,
+            historical_urls=historical_urls
+        )
+    except Exception as e:
+        print(f"Error rendering scan details page: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error: {str(e)}", 500
 
 # Route to get historical URLs for a scan
 @app.route('/scan/<int:scan_id>/historical-urls')
@@ -972,55 +996,19 @@ def host_ports(host_id):
 # Create tables when the app starts
 create_tables()
 
-# Add a test scan if the database is empty
-def add_test_scan():
+# Initialize the database if needed
+def initialize_database():
     with app.app_context():
-        # Check if there are any scans in the database
-        if Scan.query.count() == 0:
-            print("Adding test scan to database...")
-            try:
-                # Create a test scan
-                test_scan = Scan(
-                    domain="example.com",
-                    timestamp=datetime.utcnow(),
-                    status="complete",
-                    subdomains_count=3,
-                    live_hosts_count=2
-                )
-                db.session.add(test_scan)
-                db.session.flush()  # Get the scan ID
+        # Just make sure the tables exist
+        print("Initializing database...")
+        try:
+            db.create_all()
+            print("Database initialized successfully")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
 
-                # Add test subdomains
-                subdomains = ["www.example.com", "api.example.com", "mail.example.com"]
-                for subdomain in subdomains:
-                    db.session.add(Subdomain(
-                        scan_id=test_scan.id,
-                        name=subdomain,
-                        source="test"
-                    ))
-
-                # Add test live hosts
-                live_hosts = [
-                    {"url": "http://www.example.com", "status_code": "200", "technology": "Apache"},
-                    {"url": "http://api.example.com", "status_code": "200", "technology": "Nginx"}
-                ]
-                for host in live_hosts:
-                    db.session.add(LiveHost(
-                        scan_id=test_scan.id,
-                        url=host["url"],
-                        status_code=host["status_code"],
-                        technology=host["technology"]
-                    ))
-
-                # Commit changes
-                db.session.commit()
-                print("Test scan added successfully")
-            except Exception as e:
-                db.session.rollback()
-                print(f"Error adding test scan: {e}")
-
-# Add a test scan if needed
-add_test_scan()
+# Initialize the database
+initialize_database()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

@@ -25,7 +25,6 @@
                 <div class="refresh-button-container">
                     <button id="refreshButton" class="refresh-button"><i class="fas fa-sync-alt"></i> Refresh</button>
                     <button id="clearDatabaseButton" class="clear-button"><i class="fas fa-trash-alt"></i> Clear Database</button>
-                    <button id="debugModalButton" class="debug-button"><i class="fas fa-bug"></i> Test Modal</button>
                 </div>
             </div>
             <table>
@@ -40,63 +39,6 @@
                 </thead>
                 <tbody id="scanHistoryTable"></tbody>
             </table>
-        </div>
-
-        <!-- Scan Details Modal -->
-        <div id="scanDetailsModal" class="modal hidden">
-            <div class="modal-content">
-                <span class="close-button">&times;</span>
-                <h2 id="scanDetailsTitle">Scan Details</h2>
-                <div class="scan-details-tabs">
-                    <button class="scan-tab-button active" data-tab="scanSubdomains">Subdomains</button>
-                    <button class="scan-tab-button" data-tab="scanLiveHosts">Live Hosts</button>
-                    <button class="scan-tab-button" data-tab="scanHistoricalUrls">Historical URLs</button>
-                </div>
-                <div class="scan-tab-content">
-                    <div id="scanSubdomains" class="scan-tab-pane active">
-                        <div class="search-filter">
-                            <input type="text" id="scanSubdomainsFilter" placeholder="Filter subdomains...">
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Subdomain</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scanSubdomainsTable"></tbody>
-                        </table>
-                    </div>
-                    <div id="scanLiveHosts" class="scan-tab-pane">
-                        <div class="search-filter">
-                            <input type="text" id="scanLiveHostsFilter" placeholder="Filter live hosts...">
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>URL</th>
-                                    <th>Status Code</th>
-                                    <th>Technology</th>
-                                    <th>Ports</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scanLiveHostsTable"></tbody>
-                        </table>
-                    </div>
-                    <div id="scanHistoricalUrls" class="scan-tab-pane">
-                        <div class="search-filter">
-                            <input type="text" id="scanHistoricalUrlsFilter" placeholder="Filter URLs...">
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>URL</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scanHistoricalUrlsTable"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 

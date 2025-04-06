@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Details - Subdomains Finder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-search-plus"></i> Scan Details</h1>
+            <p>Detailed results for scan #{{ scan.id }} - {{ scan.domain }}</p>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="{{ url_for('scan_history_page') }}" class="nav-link"><i class="fas fa-history"></i> Scan History</a>
+            </div>
+        </header>
+
+        <div class="content-box">
+            <div class="scan-info">
+                <div class="scan-info-item">
+                    <span class="scan-info-label">Domain:</span>
+                    <span class="scan-info-value">{{ scan.domain }}</span>
+                </div>
+                <div class="scan-info-item">
+                    <span class="scan-info-label">Date:</span>
+                    <span class="scan-info-value">{{ scan.timestamp }}</span>
+                </div>
+                <div class="scan-info-item">
+                    <span class="scan-info-label">Subdomains:</span>
+                    <span class="scan-info-value">{{ scan.subdomains_count }}</span>
+                </div>
+                <div class="scan-info-item">
+                    <span class="scan-info-label">Live Hosts:</span>
+                    <span class="scan-info-value">{{ scan.live_hosts_count }}</span>
+                </div>
+                <div class="scan-info-item">
+                    <span class="scan-info-label">Status:</span>
+                    <span class="scan-info-value">{{ scan.status }}</span>
+                </div>
+            </div>
+
+            <div class="scan-details-tabs">
+                <button class="scan-tab-button active" data-tab="scanSubdomains">Subdomains</button>
+                <button class="scan-tab-button" data-tab="scanLiveHosts">Live Hosts</button>
+                <button class="scan-tab-button" data-tab="scanHistoricalUrls">Historical URLs</button>
+            </div>
+
+            <div class="scan-tab-content">
+                <div id="scanSubdomains" class="scan-tab-pane active">
+                    <div class="search-filter">
+                        <input type="text" id="scanSubdomainsFilter" placeholder="Filter subdomains...">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Subdomain</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scanSubdomainsTable">
+                            {% for subdomain in subdomains %}
+                            <tr>
+                                <td>{{ subdomain }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="scanLiveHosts" class="scan-tab-pane">
+                    <div class="search-filter">
+                        <input type="text" id="scanLiveHostsFilter" placeholder="Filter live hosts...">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>Status Code</th>
+                                <th>Technology</th>
+                                <th>Ports</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scanLiveHostsTable">
+                            {% for host in live_hosts %}
+                            <tr>
+                                <td><a href="{{ host.url }}" target="_blank">{{ host.url }}</a></td>
+                                <td class="status-{% if host.status_code|int < 300 %}2xx{% elif host.status_code|int < 400 %}3xx{% elif host.status_code|int < 500 %}4xx{% else %}5xx{% endif %}">{{ host.status_code }}</td>
+                                <td>{{ host.technology }}</td>
+                                <td>
+                                    <button class="view-button-sm" data-host-id="{{ host.id }}">View Ports</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="scanHistoricalUrls" class="scan-tab-pane">
+                    <div class="search-filter">
+                        <input type="text" id="scanHistoricalUrlsFilter" placeholder="Filter URLs...">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scanHistoricalUrlsTable">
+                            {% for url in historical_urls %}
+                            <tr>
+                                <td><a href="{{ url }}" target="_blank">{{ url }}</a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ports Modal -->
+    <div id="portsModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="portsModalTitle">Open Ports</h2>
+            <div id="portsModalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Handle tab switching
+        document.querySelectorAll('.scan-tab-button').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons and panes
+                document.querySelectorAll('.scan-tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.scan-tab-pane').forEach(pane => pane.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding pane
+                this.classList.add('active');
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Handle filtering
+        document.getElementById('scanSubdomainsFilter').addEventListener('input', function() {
+            const filterValue = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#scanSubdomainsTable tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filterValue) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('scanLiveHostsFilter').addEventListener('input', function() {
+            const filterValue = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#scanLiveHostsTable tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filterValue) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('scanHistoricalUrlsFilter').addEventListener('input', function() {
+            const filterValue = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#scanHistoricalUrlsTable tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filterValue) ? '' : 'none';
+            });
+        });
+
+        // Handle port view buttons
+        document.querySelectorAll('.view-button-sm').forEach(button => {
+            button.addEventListener('click', function() {
+                const hostId = this.getAttribute('data-host-id');
+                
+                // Show loading state
+                this.textContent = 'Loading...';
+                this.disabled = true;
+                
+                // Fetch ports data
+                fetch(`/host/${hostId}/ports`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Reset button
+                        this.textContent = 'View Ports';
+                        this.disabled = false;
+                        
+                        // Show ports modal
+                        showPortsModal(data.host.url, data.ports);
+                    })
+                    .catch(error => {
+                        console.error('Error loading ports:', error);
+                        this.textContent = 'Error';
+                        setTimeout(() => {
+                            this.textContent = 'View Ports';
+                            this.disabled = false;
+                        }, 2000);
+                    });
+            });
+        });
+
+        // Function to show ports modal
+        function showPortsModal(host, ports) {
+            const modal = document.getElementById('portsModal');
+            const title = document.getElementById('portsModalTitle');
+            const content = document.getElementById('portsModalContent');
+            
+            // Set title
+            title.textContent = `Open Ports on ${host}`;
+            
+            // Create content
+            if (ports.length === 0) {
+                content.innerHTML = '<p>No open ports found</p>';
+            } else {
+                let html = '<table class="port-table"><thead><tr><th>Port</th><th>Service</th></tr></thead><tbody>';
+                
+                ports.forEach(port => {
+                    html += `<tr><td>${port.port}</td><td>${port.service || 'Unknown'}</td></tr>`;
+                });
+                
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            }
+            
+            // Show modal
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+            
+            // Add close button functionality
+            document.querySelector('#portsModal .close-button').addEventListener('click', function() {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            });
+            
+            // Close when clicking outside
+            modal.addEventListener('click', function(event) {
+                if (event.target === modal) {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
