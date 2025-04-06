@@ -1,7 +1,7 @@
 import os
 import threading
 import re
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, current_app
 from concurrent.futures import ThreadPoolExecutor
 
 from reconaug import db
@@ -97,6 +97,9 @@ def run_scan_in_background(domain, task_id):
         # Create output directory if it doesn't exist
         os.makedirs('output', exist_ok=True)
 
+        # Get the current application context
+        app = current_app._get_current_object()
+
         # Clean up any existing output files
         for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",
                             f"output/domain_{domain}.txt", f"output/httpx_{domain}.txt",
@@ -153,13 +156,14 @@ def run_scan_in_background(domain, task_id):
             print(f"Found {len(all_domains)} subdomains and {len(live_hosts)} live hosts")
 
             # Use application context for database operations
-            scan_id = save_scan_to_database(domain, all_domains, live_hosts)
-            if scan_id:
-                print(f"Scan results saved successfully with ID: {scan_id}")
-                db_message = f'Scan complete. Results saved to database (ID: {scan_id}).'
-            else:
-                print("Failed to save scan results to database")
-                db_message = 'Scan complete. Note: Failed to save results to database.'
+            with app.app_context():
+                scan_id = save_scan_to_database(domain, all_domains, live_hosts)
+                if scan_id:
+                    print(f"Scan results saved successfully with ID: {scan_id}")
+                    db_message = f'Scan complete. Results saved to database (ID: {scan_id}).'
+                else:
+                    print("Failed to save scan results to database")
+                    db_message = 'Scan complete. Note: Failed to save results to database.'
         except Exception as db_error:
             print(f"Error saving to database: {db_error}")
             import traceback

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, Response, stream_with_context
+from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app
 import time
 from reconaug import db
 from reconaug.models import Scan, Subdomain, LiveHost, Port, HistoricalUrl
@@ -100,37 +100,42 @@ def run_gau():
     # Try to find the most recent scan for this domain to associate the URLs with
     if len(urls) > 0:
         try:
-            # Try exact domain match first
-            scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
+            # Get the current application context
+            app = current_app._get_current_object()
 
-            # If no scan found and domain starts with www, try without www
-            if not scan and domain.startswith('www.'):
-                base_domain = domain[4:]
-                scan = Scan.query.filter_by(domain=base_domain).order_by(Scan.timestamp.desc()).first()
+            # Use application context for database operations
+            with app.app_context():
+                # Try exact domain match first
+                scan = Scan.query.filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
 
-            # If no scan found and domain doesn't start with www, try with www
-            if not scan and not domain.startswith('www.'):
-                www_domain = f"www.{domain}"
-                scan = Scan.query.filter_by(domain=www_domain).order_by(Scan.timestamp.desc()).first()
+                # If no scan found and domain starts with www, try without www
+                if not scan and domain.startswith('www.'):
+                    base_domain = domain[4:]
+                    scan = Scan.query.filter_by(domain=base_domain).order_by(Scan.timestamp.desc()).first()
 
-            if scan:
-                print(f"Found scan ID {scan.id} for domain {scan.domain}")
-                # Check if we already have historical URLs for this scan
-                existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
-                if existing_urls == 0:
-                    print(f"No existing historical URLs for scan ID {scan.id}, saving {len(urls)} URLs")
-                    # Save historical URLs to database
-                    for url in urls:
-                        db.session.add(HistoricalUrl(
-                            scan_id=scan.id,
-                            url=url
-                        ))
-                    db.session.commit()
-                    print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+                # If no scan found and domain doesn't start with www, try with www
+                if not scan and not domain.startswith('www.'):
+                    www_domain = f"www.{domain}"
+                    scan = Scan.query.filter_by(domain=www_domain).order_by(Scan.timestamp.desc()).first()
+
+                if scan:
+                    print(f"Found scan ID {scan.id} for domain {scan.domain}")
+                    # Check if we already have historical URLs for this scan
+                    existing_urls = HistoricalUrl.query.filter_by(scan_id=scan.id).count()
+                    if existing_urls == 0:
+                        print(f"No existing historical URLs for scan ID {scan.id}, saving {len(urls)} URLs")
+                        # Save historical URLs to database
+                        for url in urls:
+                            db.session.add(HistoricalUrl(
+                                scan_id=scan.id,
+                                url=url
+                            ))
+                        db.session.commit()
+                        print(f"Saved {len(urls)} historical URLs to database for scan ID {scan.id}")
+                    else:
+                        print(f"Found {existing_urls} existing historical URLs for scan ID {scan.id}, skipping")
                 else:
-                    print(f"Found {existing_urls} existing historical URLs for scan ID {scan.id}, skipping")
-            else:
-                print(f"No scan found for domain {domain} or its variations")
+                    print(f"No scan found for domain {domain} or its variations")
         except Exception as e:
             print(f"Error saving historical URLs to database: {e}")
             import traceback
@@ -172,11 +177,16 @@ def scan_ports_api():
 
     # Save port scan results to database
     try:
-        success = save_ports_to_database(host, ports)
-        if success:
-            print(f"Saved {len(ports)} ports to database for host {host}")
-        else:
-            print(f"Failed to save ports to database for host {host}")
+        # Get the current application context
+        app = current_app._get_current_object()
+
+        # Use application context for database operations
+        with app.app_context():
+            success = save_ports_to_database(host, ports)
+            if success:
+                print(f"Saved {len(ports)} ports to database for host {host}")
+            else:
+                print(f"Failed to save ports to database for host {host}")
     except Exception as e:
         print(f"Error saving ports to database: {e}")
         import traceback
