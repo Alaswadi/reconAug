@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to fetch the full task results
     function fetchTaskResults(taskId) {
-        fetch(`/task/${taskId}`)
+        fetch(`/api/task/${taskId}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Create a new event source
-        eventSource = new EventSource(`/task/${taskId}/events`);
+        eventSource = new EventSource(`/api/task/${taskId}/events`);
 
         // Listen for messages
         eventSource.onmessage = function(event) {
@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
         gauLoading[domain] = true;
 
         // Make AJAX request to run GAU
-        fetch(`/run-gau?domain=${encodeURIComponent(domain)}`, {
+        fetch(`/api/run-gau?domain=${encodeURIComponent(domain)}`, {
             method: 'GET'
         })
         .then(response => {
@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', function() {
         portScanLoading[host] = true;
 
         // Make AJAX request to scan ports
-        fetch(`/scan-ports?host=${encodeURIComponent(host)}`, {
+        fetch(`/api/scan-ports?host=${encodeURIComponent(host)}`, {
             method: 'GET'
         })
         .then(response => {
