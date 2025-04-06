@@ -86,15 +86,53 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Close modal when clicking the close button
     document.querySelector('#scanDetailsModal .close-button').addEventListener('click', function() {
+        console.log('Closing modal...');
         scanDetailsModal.classList.add('hidden');
+        scanDetailsModal.style.display = 'none';
     });
 
     // Close modal when clicking outside the modal content
     scanDetailsModal.addEventListener('click', function(event) {
         if (event.target === scanDetailsModal) {
+            console.log('Closing modal (clicked outside)...');
             scanDetailsModal.classList.add('hidden');
+            scanDetailsModal.style.display = 'none';
         }
     });
+
+    // Add debug modal button functionality
+    const debugModalButton = document.getElementById('debugModalButton');
+    if (debugModalButton) {
+        debugModalButton.addEventListener('click', function() {
+            console.log('Testing modal...');
+
+            // Set some test data
+            scanDetailsTitle.textContent = 'Test Modal';
+
+            // Show the modal
+            scanDetailsModal.classList.remove('hidden');
+            scanDetailsModal.style.display = 'flex';
+
+            // Log modal state
+            console.log('Modal element:', scanDetailsModal);
+            console.log('Modal hidden class removed:', !scanDetailsModal.classList.contains('hidden'));
+            console.log('Modal display style:', scanDetailsModal.style.display);
+            console.log('Modal computed style:', window.getComputedStyle(scanDetailsModal));
+
+            // Populate tables with test data
+            populateScanSubdomainsTable(['test1.example.com', 'test2.example.com']);
+            populateScanLiveHostsTable([{
+                id: 999,
+                url: 'http://test.example.com',
+                status_code: '200',
+                technology: 'Test Technology'
+            }]);
+            populateScanHistoricalUrlsTable(['http://test.example.com/page1', 'http://test.example.com/page2']);
+
+            // Reset to first tab
+            scanTabButtons[0].click();
+        });
+    }
 
     // Handle scan tab switching
     scanTabButtons.forEach(button => {
@@ -273,7 +311,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 scanTabButtons[0].click();
 
                 // Show modal
+                console.log('Showing modal...');
                 scanDetailsModal.classList.remove('hidden');
+                scanDetailsModal.style.display = 'flex';
+
+                // Log modal state for debugging
+                console.log('Modal hidden class removed:', !scanDetailsModal.classList.contains('hidden'));
+                console.log('Modal display style:', scanDetailsModal.style.display);
+                console.log('Modal visibility:', window.getComputedStyle(scanDetailsModal).visibility);
+                console.log('Modal opacity:', window.getComputedStyle(scanDetailsModal).opacity);
             })
             .catch(error => {
                 console.error('Error loading scan details:', error);

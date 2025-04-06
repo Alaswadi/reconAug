@@ -320,6 +320,26 @@ button:hover {
     margin-right: 5px;
 }
 
+.debug-button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    margin-left: 10px;
+}
+
+.debug-button:hover {
+    background-color: #5a6268;
+}
+
+.debug-button i {
+    margin-right: 5px;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
@@ -436,6 +456,11 @@ a:hover {
 
 .hidden {
     display: none !important;
+}
+
+/* Make sure modals are visible when not hidden */
+.modal:not(.hidden) {
+    display: flex !important;
 }
 
 .modal-content {
