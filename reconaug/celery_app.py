@@ -1,4 +1,5 @@
 from celery import Celery
+from flask import Flask
 
 # Create Celery app
 celery = Celery(
@@ -22,15 +23,23 @@ celery.conf.update(
     task_soft_time_limit=3540,  # 59 minutes
 )
 
+# Define a base task class that ensures we have an app context
+class FlaskTask(celery.Task):
+    abstract = True
+
+    def __call__(self, *args, **kwargs):
+        from reconaug import create_app
+        app = create_app()
+        with app.app_context():
+            return self.run(*args, **kwargs)
+
+# Set the default task base class
+celery.Task = FlaskTask
+
 def create_celery_app(app=None):
     """Create and configure Celery app with Flask context"""
     if app:
-        # Use Flask application context
-        class ContextTask(celery.Task):
-            def __call__(self, *args, **kwargs):
-                with app.app_context():
-                    return self.run(*args, **kwargs)
-        
-        celery.Task = ContextTask
-    
+        # Use the provided Flask application
+        celery.flask_app = app
+
     return celery

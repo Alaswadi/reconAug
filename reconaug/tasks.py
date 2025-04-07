@@ -5,9 +5,7 @@ import json
 from reconaug.celery_app import celery
 from reconaug.tools.subdomain import get_subdomains_subfinder, get_subdomains_crtsh, get_subdomains_sublist3r
 from reconaug.tools.scanner import check_live_hosts, get_historical_urls, scan_ports
-from reconaug.utils.database import save_scan_to_database
-from reconaug import db
-from reconaug.models import Scan, HistoricalUrl
+from reconaug.utils.celery_db import save_scan_results, save_port_scan_results
 
 @celery.task(bind=True)
 def run_scan_task(self, domain):
@@ -15,14 +13,14 @@ def run_scan_task(self, domain):
     try:
         # Create output directory if it doesn't exist
         os.makedirs('output', exist_ok=True)
-        
+
         # Clean up any existing output files
         for file_pattern in [f"output/subfinder_{domain}.txt", f"output/crtsh_{domain}.txt",
                             f"output/domain_{domain}.txt", f"output/httpx_{domain}.txt",
                             f"output/gau_{domain}.txt", f"output/sublist3r_{domain}.txt"]:
             if os.path.exists(file_pattern):
                 os.remove(file_pattern)
-        
+
         # Update task state
         self.update_state(
             state='PROGRESS',
@@ -34,12 +32,12 @@ def run_scan_task(self, domain):
                 'live_hosts_count': 0
             }
         )
-        
+
         # Run subdomain discovery tools in parallel
         with ThreadPoolExecutor(max_workers=3) as executor:
             subfinder_future = executor.submit(get_subdomains_subfinder, domain)
             sublist3r_future = executor.submit(get_subdomains_sublist3r, domain)
-            
+
             # Update progress
             self.update_state(
                 state='PROGRESS',
@@ -51,9 +49,9 @@ def run_scan_task(self, domain):
                     'live_hosts_count': 0
                 }
             )
-            
+
             crtsh_future = executor.submit(get_subdomains_crtsh, domain)
-            
+
             subfinder_results = subfinder_future.result()
             self.update_state(
                 state='PROGRESS',
@@ -65,7 +63,7 @@ def run_scan_task(self, domain):
                     'live_hosts_count': 0
                 }
             )
-            
+
             sublist3r_results = sublist3r_future.result()
             self.update_state(
                 state='PROGRESS',
@@ -77,7 +75,7 @@ def run_scan_task(self, domain):
                     'live_hosts_count': 0
                 }
             )
-            
+
             crtsh_results = crtsh_future.result()
             self.update_state(
                 state='PROGRESS',
@@ -89,16 +87,16 @@ def run_scan_task(self, domain):
                     'live_hosts_count': 0
                 }
             )
-        
+
         # Combine and deduplicate results
         all_domains = list(set(subfinder_results + sublist3r_results + crtsh_results))
-        
+
         # Save all domains to a file
         output_file = f"output/domain_{domain}.txt"
         with open(output_file, 'w') as f:
             for d in all_domains:
                 f.write(f"{d}\n")
-        
+
         self.update_state(
             state='PROGRESS',
             meta={
@@ -109,10 +107,10 @@ def run_scan_task(self, domain):
                 'live_hosts_count': 0
             }
         )
-        
+
         # Check which domains are live
         live_hosts = check_live_hosts(all_domains)
-        
+
         self.update_state(
             state='PROGRESS',
             meta={
@@ -123,17 +121,14 @@ def run_scan_task(self, domain):
                 'live_hosts_count': len(live_hosts)
             }
         )
-        
+
         # Save results to database
-        try:
-            scan_id = save_scan_to_database(domain, all_domains, live_hosts)
+        scan_id = save_scan_results(domain, all_domains, live_hosts)
+        if scan_id:
             db_message = f'Results saved to database (ID: {scan_id}).'
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            scan_id = None
+        else:
             db_message = 'Note: Failed to save results to database.'
-        
+
         # Return the final result
         return {
             'status': 'complete',
@@ -167,47 +162,19 @@ def run_gau_task(self, domain):
                 'message': f'Running GAU for {domain}...'
             }
         )
-        
+
         urls, error = get_historical_urls(domain)
-        
+
         if error:
             return {
                 'status': 'error',
                 'message': f'Error running GAU: {error}',
                 'urls': []
             }
-        
-        # Try to find the most recent scan for this domain
-        scan = None
-        try:
-            scan = db.session.query(Scan).filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
-            if not scan and domain.startswith('www.'):
-                base_domain = domain[4:]
-                scan = db.session.query(Scan).filter_by(domain=base_domain).order_by(Scan.timestamp.desc()).first()
-            if not scan and not domain.startswith('www.'):
-                www_domain = f"www.{domain}"
-                scan = db.session.query(Scan).filter_by(domain=www_domain).order_by(Scan.timestamp.desc()).first()
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-        
-        # Save URLs to database if we found a scan
-        if scan:
-            try:
-                # Check if we already have historical URLs for this scan
-                existing_urls = db.session.query(HistoricalUrl).filter_by(scan_id=scan.id).count()
-                if existing_urls == 0:
-                    # Save historical URLs to database
-                    for url in urls:
-                        db.session.add(HistoricalUrl(
-                            scan_id=scan.id,
-                            url=url
-                        ))
-                    db.session.commit()
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-        
+
+        # For now, we'll skip saving URLs to the database in the Celery task
+        # This will be handled by the API endpoint instead
+
         return {
             'status': 'complete',
             'progress': 100,
@@ -240,24 +207,19 @@ def run_port_scan_task(self, host):
                 'message': f'Scanning ports for {host}...'
             }
         )
-        
+
         ports, error = scan_ports(host)
-        
+
         if error:
             return {
                 'status': 'error',
                 'message': f'Error scanning ports: {error}',
                 'ports': []
             }
-        
+
         # Save ports to database
-        try:
-            from reconaug.utils.database import save_ports_to_database
-            success = save_ports_to_database(host, ports)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-        
+        success = save_port_scan_results(host, ports)
+
         return {
             'status': 'complete',
             'progress': 100,

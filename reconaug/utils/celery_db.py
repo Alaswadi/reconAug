@@ -1,28 +1,17 @@
 from datetime import datetime
-from flask import current_app
-from reconaug import db, create_app
+from reconaug import create_app
 from reconaug.models import Scan, Subdomain, LiveHost, Port, HistoricalUrl
-import contextlib
 
-@contextlib.contextmanager
-def ensure_app_context():
-    """Ensure we have a Flask application context"""
+def save_scan_results(domain, subdomains, live_hosts):
+    """Save scan results to the database using a new app context"""
     try:
-        # Check if we're already in an app context
-        current_app._get_current_object()
-        yield
-    except RuntimeError:
-        # Create a new app context if we're not in one
+        # Create a new Flask app and context
         app = create_app()
         with app.app_context():
-            yield
-
-def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
-    """Save scan results to the database"""
-    try:
-        print(f"Starting database save for domain: {domain}")
-
-        with ensure_app_context():
+            from reconaug import db
+            
+            print(f"Starting database save for domain: {domain}")
+            
             # Create a new scan record
             scan = Scan(
                 domain=domain,
@@ -34,8 +23,7 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
             db.session.add(scan)
             db.session.flush()  # Get the scan ID without committing
             print(f"Created scan record with ID: {scan.id}")
-
-        with ensure_app_context():
+            
             # Add subdomains
             print(f"Adding {len(subdomains)} subdomains to database")
             for subdomain in subdomains:
@@ -44,7 +32,7 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
                     name=subdomain,
                     source='combined'  # We don't track individual sources in this version
                 ))
-
+            
             # Add live hosts
             print(f"Adding {len(live_hosts)} live hosts to database")
             for host in live_hosts:
@@ -61,38 +49,31 @@ def save_scan_to_database(domain, subdomains, live_hosts, historical_urls=None):
                     print(f"KeyError in live host data: {ke}. Host data: {host}")
                     # Continue with other hosts even if one fails
                     continue
-
-            # Add historical URLs if available
-            if historical_urls:
-                print(f"Adding {len(historical_urls)} historical URLs to database")
-                for url in historical_urls:
-                    db.session.add(HistoricalUrl(
-                        scan_id=scan.id,
-                        url=url
-                    ))
-
+            
             # Commit all changes
             db.session.commit()
             print(f"Scan results for {domain} saved to database successfully")
             return scan.id
     except Exception as e:
-        with ensure_app_context():
-            db.session.rollback()
         print(f"Error saving scan results to database: {e}")
         import traceback
         traceback.print_exc()
         return None
 
-def save_ports_to_database(host_url, ports):
-    """Save port scan results to the database"""
+def save_port_scan_results(host_url, ports):
+    """Save port scan results to the database using a new app context"""
     try:
-        with ensure_app_context():
+        # Create a new Flask app and context
+        app = create_app()
+        with app.app_context():
+            from reconaug import db
+            
             # Find the live host record
             host = LiveHost.query.filter_by(url=host_url).first()
             if not host:
                 print(f"Live host {host_url} not found in database")
                 return False
-
+            
             # Add ports
             for port in ports:
                 db.session.add(Port(
@@ -100,15 +81,15 @@ def save_ports_to_database(host_url, ports):
                     port_number=port,
                     service=get_common_service(port)
                 ))
-
+            
             # Commit changes
             db.session.commit()
             print(f"Port scan results for {host_url} saved to database")
             return True
     except Exception as e:
-        with ensure_app_context():
-            db.session.rollback()
         print(f"Error saving port scan results to database: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def get_common_service(port):
