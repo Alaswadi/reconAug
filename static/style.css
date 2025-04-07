@@ -715,3 +715,54 @@ a:hover {
     background-color: #cccccc;
     cursor: not-allowed;
 }
+
+/* Task status indicators */
+.task-status-indicator {
+    margin: 5px 0;
+    padding: 8px 12px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.task-type {
+    font-weight: bold;
+    margin-right: 5px;
+    background-color: #333;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.task-target {
+    margin-right: 5px;
+    font-family: monospace;
+}
+
+.task-progress {
+    margin-left: auto;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.status-running {
+    background-color: var(--secondary-color); /* Blue */
+    color: white;
+}
+
+.status-complete {
+    background-color: var(--primary-color); /* Green */
+    color: white;
+}
+
+.status-error {
+    background-color: var(--danger-color); /* Red */
+    color: white;
+}
+
+.status-timeout {
+    background-color: var(--warning-color); /* Orange */
+    color: white;
+}

@@ -234,6 +234,11 @@
 
                         // Show success message
                         alert(`Port scan started for ${hostUrl}. Task ID: ${data.task_id || 'unknown'}`);
+
+                        // Poll for results
+                        if (data.task_id) {
+                            pollTaskStatus(data.task_id, 'port', hostUrl);
+                        }
                     })
                     .catch(error => {
                         console.error('Error scanning ports:', error);
@@ -278,6 +283,11 @@
 
                         // Show success message
                         alert(`GAU scan started for ${domain}. Task ID: ${data.task_id || 'unknown'}`);
+
+                        // Poll for results
+                        if (data.task_id) {
+                            pollTaskStatus(data.task_id, 'gau', domain);
+                        }
                     })
                     .catch(error => {
                         console.error('Error running GAU:', error);
@@ -289,6 +299,146 @@
                     });
             });
         });
+
+        // Function to poll task status and display results when ready
+        function pollTaskStatus(taskId, taskType, target) {
+            console.log(`Polling status for ${taskType} task ${taskId} for ${target}`);
+
+            // Create a status indicator
+            const statusId = `status-${taskId.replace(/[^a-zA-Z0-9]/g, '')}`;
+            let statusElement = document.getElementById(statusId);
+
+            if (!statusElement) {
+                // Create a new status element if it doesn't exist
+                statusElement = document.createElement('div');
+                statusElement.id = statusId;
+                statusElement.className = 'task-status-indicator';
+                statusElement.innerHTML = `<span class="task-type">${taskType.toUpperCase()}</span> <span class="task-target">${target}</span>: <span class="task-progress">Waiting...</span>`;
+
+                // Add it to the page
+                const scanInfoSection = document.querySelector('.scan-info');
+                scanInfoSection.appendChild(statusElement);
+            }
+
+            // Function to update the status element
+            function updateStatus(status, message) {
+                const progressElement = statusElement.querySelector('.task-progress');
+                progressElement.textContent = message;
+                progressElement.className = `task-progress status-${status}`;
+            }
+
+            // Start polling
+            let attempts = 0;
+            const maxAttempts = 60; // 5 minutes (5s interval)
+            const pollInterval = 5000; // 5 seconds
+
+            const checkStatus = function() {
+                fetch(`/api/task/${taskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(`Task ${taskId} status:`, data);
+
+                        if (data.status === 'complete') {
+                            updateStatus('complete', 'Complete');
+
+                            // Display the results based on task type
+                            if (taskType === 'gau' && data.urls) {
+                                showGauResults(target, data.urls, data.count);
+                            } else if (taskType === 'port' && data.ports) {
+                                showPortsResults(target, data.ports);
+                            }
+
+                            // Stop polling
+                            return;
+                        } else if (data.status === 'error') {
+                            updateStatus('error', `Error: ${data.message || 'Unknown error'}`);
+                            // Stop polling
+                            return;
+                        } else {
+                            // Still running
+                            updateStatus('running', `Running (${data.progress || 0}%)`);
+
+                            // Continue polling if we haven't reached max attempts
+                            attempts++;
+                            if (attempts < maxAttempts) {
+                                setTimeout(checkStatus, pollInterval);
+                            } else {
+                                updateStatus('timeout', 'Timed out');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error checking task ${taskId} status:`, error);
+                        updateStatus('error', 'Error checking status');
+
+                        // Try again if we haven't reached max attempts
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(checkStatus, pollInterval);
+                        } else {
+                            updateStatus('timeout', 'Timed out');
+                        }
+                    });
+            };
+
+            // Start the first check
+            setTimeout(checkStatus, 2000); // Wait 2 seconds before first check
+        }
+
+        // Function to show GAU results
+        function showGauResults(domain, urls, count) {
+            console.log(`Showing GAU results for ${domain}: ${count} URLs`);
+
+            // Switch to the Historical URLs tab
+            document.querySelector('.scan-tab-button[data-tab="historicalUrlsTab"]').click();
+
+            // Update the table
+            const table = document.getElementById('scanHistoricalUrlsTable');
+            const tbody = table.querySelector('tbody') || table;
+
+            // Clear existing content
+            tbody.innerHTML = '';
+
+            // Add the URLs
+            if (!urls || urls.length === 0) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.textContent = 'No historical URLs found';
+                row.appendChild(cell);
+                tbody.appendChild(row);
+            } else {
+                urls.forEach(url => {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.textContent = url;
+                    link.target = '_blank';
+                    cell.appendChild(link);
+                    row.appendChild(cell);
+                    tbody.appendChild(row);
+                });
+
+                // Add a message if results are limited
+                if (count > urls.length) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.textContent = `Showing ${urls.length} of ${count} URLs`;
+                    cell.style.fontStyle = 'italic';
+                    cell.style.textAlign = 'center';
+                    row.appendChild(cell);
+                    tbody.appendChild(row);
+                }
+            }
+        }
+
+        // Function to show port scan results
+        function showPortsResults(host, ports) {
+            console.log(`Showing port scan results for ${host}: ${ports.length} ports`);
+
+            // Show the ports modal
+            showPortsModal(host, ports);
+        }
 
         // Function to show ports modal
         function showPortsModal(host, ports) {
