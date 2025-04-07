@@ -92,8 +92,8 @@ def task_events(task_id):
 
     return Response(stream_with_context(generate()), content_type='text/event-stream')
 
-@api_celery_bp.route('/run-gau', methods=['GET'])
-def run_gau():
+@api_celery_bp.route('/celery/run-gau', methods=['GET'])
+def celery_run_gau():
     domain = request.args.get('domain', '').strip()
 
     if not domain:
@@ -112,8 +112,8 @@ def run_gau():
         'status': 'started'
     })
 
-@api_celery_bp.route('/scan-ports', methods=['GET'])
-def scan_ports():
+@api_celery_bp.route('/celery/scan-ports', methods=['GET'])
+def celery_scan_ports():
     host = request.args.get('host', '').strip()
 
     if not host:

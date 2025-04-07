@@ -220,15 +220,20 @@
                 this.disabled = true;
 
                 // Call the scan-ports API
-                fetch(`/api/scan-ports?host=${encodeURIComponent(hostUrl)}`)
-                    .then(response => response.json())
+                console.log(`Calling scan-ports API for host: ${hostUrl}`);
+                fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostUrl)}`)
+                    .then(response => {
+                        console.log('Scan ports API response status:', response.status);
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('Scan ports API response data:', data);
                         // Reset button
                         this.textContent = 'Scan Ports';
                         this.disabled = false;
 
                         // Show success message
-                        alert(`Port scan started for ${hostUrl}. Task ID: ${data.task_id}`);
+                        alert(`Port scan started for ${hostUrl}. Task ID: ${data.task_id || 'unknown'}`);
                     })
                     .catch(error => {
                         console.error('Error scanning ports:', error);
@@ -259,15 +264,20 @@
                 this.disabled = true;
 
                 // Call the run-gau API
-                fetch(`/api/run-gau?domain=${encodeURIComponent(domain)}`)
-                    .then(response => response.json())
+                console.log(`Calling run-gau API for domain: ${domain}`);
+                fetch(`/api/celery/run-gau?domain=${encodeURIComponent(domain)}`)
+                    .then(response => {
+                        console.log('Run GAU API response status:', response.status);
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('Run GAU API response data:', data);
                         // Reset button
                         this.textContent = 'Run GAU';
                         this.disabled = false;
 
                         // Show success message
-                        alert(`GAU scan started for ${domain}. Task ID: ${data.task_id}`);
+                        alert(`GAU scan started for ${domain}. Task ID: ${data.task_id || 'unknown'}`);
                     })
                     .catch(error => {
                         console.error('Error running GAU:', error);
