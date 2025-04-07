@@ -438,10 +438,11 @@
             }
 
             // Check if the Historical URLs tab exists
-            const tabButton = document.querySelector('.scan-tab-button[data-tab="historicalUrlsTab"]');
+            const tabButton = document.querySelector('.scan-tab-button[data-tab="scanHistoricalUrls"]');
             if (!tabButton) {
                 console.error('Historical URLs tab button not found');
-                alert('Error: Historical URLs tab not found');
+                // Create a modal to display the results instead
+                showUrlsModal(domain, urls, count);
                 return;
             }
 
@@ -452,7 +453,8 @@
             const table = document.getElementById('scanHistoricalUrlsTable');
             if (!table) {
                 console.error('Historical URLs table not found');
-                alert('Error: Historical URLs table not found');
+                // Create a modal to display the results instead
+                showUrlsModal(domain, urls, count);
                 return;
             }
 
@@ -523,6 +525,116 @@
 
             // Show the ports modal
             showPortsModal(host, ports);
+        }
+
+        // Function to show URLs in a modal
+        function showUrlsModal(domain, urls, count) {
+            console.log(`Showing URLs modal for ${domain}: ${urls.length} URLs`);
+
+            // Create modal elements if they don't exist
+            let modal = document.getElementById('urlsModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'urlsModal';
+                modal.className = 'modal hidden';
+
+                const modalContent = document.createElement('div');
+                modalContent.className = 'modal-content';
+
+                const closeButton = document.createElement('span');
+                closeButton.className = 'close-button';
+                closeButton.innerHTML = '&times;';
+                closeButton.onclick = function() {
+                    modal.classList.add('hidden');
+                };
+
+                const modalTitle = document.createElement('h2');
+                modalTitle.id = 'urlsModalTitle';
+
+                const modalBody = document.createElement('div');
+                modalBody.id = 'urlsModalContent';
+
+                modalContent.appendChild(closeButton);
+                modalContent.appendChild(modalTitle);
+                modalContent.appendChild(modalBody);
+                modal.appendChild(modalContent);
+
+                // Add modal to the page
+                document.body.appendChild(modal);
+
+                // Close modal when clicking outside
+                modal.onclick = function(event) {
+                    if (event.target === modal) {
+                        modal.classList.add('hidden');
+                    }
+                };
+            }
+
+            // Update modal content
+            const modalTitle = document.getElementById('urlsModalTitle');
+            const modalContent = document.getElementById('urlsModalContent');
+
+            modalTitle.textContent = `Historical URLs for ${domain}`;
+
+            // Create a filter input
+            const filterContainer = document.createElement('div');
+            filterContainer.className = 'filter-container';
+
+            const filterInput = document.createElement('input');
+            filterInput.type = 'text';
+            filterInput.placeholder = 'Filter URLs...';
+            filterInput.className = 'filter-input';
+
+            filterContainer.appendChild(filterInput);
+
+            // Create table for URLs
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'table-container';
+            tableContainer.style.maxHeight = '400px';
+            tableContainer.style.overflowY = 'auto';
+
+            let tableHtml = '<table><thead><tr><th>URL</th></tr></thead><tbody>';
+
+            if (urls.length === 0) {
+                tableHtml += '<tr><td>No historical URLs found</td></tr>';
+            } else {
+                urls.forEach(url => {
+                    if (typeof url === 'string') {
+                        tableHtml += `<tr><td><a href="${url}" target="_blank">${url}</a></td></tr>`;
+                    }
+                });
+
+                // Add a message if results are limited
+                if (count > urls.length) {
+                    tableHtml += `<tr><td style="font-style: italic; text-align: center;">Showing ${urls.length} of ${count} URLs</td></tr>`;
+                }
+            }
+
+            tableHtml += '</tbody></table>';
+            tableContainer.innerHTML = tableHtml;
+
+            // Clear previous content
+            modalContent.innerHTML = '';
+            modalContent.appendChild(filterContainer);
+            modalContent.appendChild(tableContainer);
+
+            // Add filter functionality
+            filterInput.addEventListener('input', function() {
+                const filterValue = this.value.toLowerCase();
+                const rows = tableContainer.querySelectorAll('tbody tr');
+
+                rows.forEach(row => {
+                    const url = row.querySelector('td')?.textContent.toLowerCase();
+                    if (url && url.includes(filterValue)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+
+            // Show modal
+            modal.classList.remove('hidden');
         }
 
         // Function to show ports modal

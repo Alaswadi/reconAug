@@ -172,8 +172,16 @@ def run_gau_task(self, domain):
                 'urls': []
             }
 
-        # For now, we'll skip saving URLs to the database in the Celery task
-        # This will be handled by the API endpoint instead
+        # Save URLs to the database
+        try:
+            from reconaug.utils.celery_db import save_historical_urls
+            scan_id = save_historical_urls(domain, urls)
+            if scan_id:
+                print(f"Saved {len(urls)} historical URLs to database for scan ID: {scan_id}")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Error saving historical URLs to database: {e}")
 
         return {
             'status': 'complete',

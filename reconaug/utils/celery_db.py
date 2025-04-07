@@ -9,9 +9,9 @@ def save_scan_results(domain, subdomains, live_hosts):
         app = create_app()
         with app.app_context():
             from reconaug import db
-            
+
             print(f"Starting database save for domain: {domain}")
-            
+
             # Create a new scan record
             scan = Scan(
                 domain=domain,
@@ -23,7 +23,7 @@ def save_scan_results(domain, subdomains, live_hosts):
             db.session.add(scan)
             db.session.flush()  # Get the scan ID without committing
             print(f"Created scan record with ID: {scan.id}")
-            
+
             # Add subdomains
             print(f"Adding {len(subdomains)} subdomains to database")
             for subdomain in subdomains:
@@ -32,7 +32,7 @@ def save_scan_results(domain, subdomains, live_hosts):
                     name=subdomain,
                     source='combined'  # We don't track individual sources in this version
                 ))
-            
+
             # Add live hosts
             print(f"Adding {len(live_hosts)} live hosts to database")
             for host in live_hosts:
@@ -49,7 +49,7 @@ def save_scan_results(domain, subdomains, live_hosts):
                     print(f"KeyError in live host data: {ke}. Host data: {host}")
                     # Continue with other hosts even if one fails
                     continue
-            
+
             # Commit all changes
             db.session.commit()
             print(f"Scan results for {domain} saved to database successfully")
@@ -67,13 +67,13 @@ def save_port_scan_results(host_url, ports):
         app = create_app()
         with app.app_context():
             from reconaug import db
-            
+
             # Find the live host record
             host = LiveHost.query.filter_by(url=host_url).first()
             if not host:
                 print(f"Live host {host_url} not found in database")
                 return False
-            
+
             # Add ports
             for port in ports:
                 db.session.add(Port(
@@ -81,7 +81,7 @@ def save_port_scan_results(host_url, ports):
                     port_number=port,
                     service=get_common_service(port)
                 ))
-            
+
             # Commit changes
             db.session.commit()
             print(f"Port scan results for {host_url} saved to database")
@@ -91,6 +91,72 @@ def save_port_scan_results(host_url, ports):
         import traceback
         traceback.print_exc()
         return False
+
+def save_historical_urls(domain, urls):
+    """Save historical URLs to the database using a new app context"""
+    try:
+        # Create a new Flask app and context
+        app = create_app()
+        with app.app_context():
+            from reconaug import db
+
+            print(f"Saving historical URLs for domain: {domain}")
+
+            # Find the most recent scan for this domain
+            from reconaug.models import Scan
+            scan = db.session.query(Scan).filter_by(domain=domain).order_by(Scan.timestamp.desc()).first()
+
+            # If no scan found, try with/without www prefix
+            if not scan and domain.startswith('www.'):
+                base_domain = domain[4:]
+                scan = db.session.query(Scan).filter_by(domain=base_domain).order_by(Scan.timestamp.desc()).first()
+            if not scan and not domain.startswith('www.'):
+                www_domain = f"www.{domain}"
+                scan = db.session.query(Scan).filter_by(domain=www_domain).order_by(Scan.timestamp.desc()).first()
+
+            # If still no scan found, create a new one
+            if not scan:
+                print(f"No existing scan found for {domain}, creating new scan record")
+                scan = Scan(
+                    domain=domain,
+                    timestamp=datetime.utcnow(),
+                    status='complete',
+                    subdomains_count=0,
+                    live_hosts_count=0
+                )
+                db.session.add(scan)
+                db.session.flush()  # Get the scan ID without committing
+
+            print(f"Using scan ID: {scan.id} for historical URLs")
+
+            # Check if we already have historical URLs for this scan
+            existing_count = db.session.query(HistoricalUrl).filter_by(scan_id=scan.id).count()
+            if existing_count > 0:
+                print(f"Found {existing_count} existing historical URLs for scan ID: {scan.id}, deleting them")
+                db.session.query(HistoricalUrl).filter_by(scan_id=scan.id).delete()
+
+            # Add historical URLs
+            print(f"Adding {len(urls)} historical URLs to database")
+            batch_size = 100
+            for i in range(0, len(urls), batch_size):
+                batch = urls[i:i+batch_size]
+                for url in batch:
+                    if isinstance(url, str):
+                        db.session.add(HistoricalUrl(
+                            scan_id=scan.id,
+                            url=url
+                        ))
+                db.session.flush()
+
+            # Commit all changes
+            db.session.commit()
+            print(f"Historical URLs for {domain} saved to database successfully")
+            return scan.id
+    except Exception as e:
+        print(f"Error saving historical URLs to database: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def get_common_service(port):
     """Return common service name for a port number"""
