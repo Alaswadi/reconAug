@@ -39,12 +39,12 @@ def scan():
         task = run_scan_task.delay(domain)
         print(f"Started Celery task with ID: {task.id}")
 
-        # Redirect to the scan progress page
+        # Redirect to the history page instead of the scan progress page
         return jsonify({
             'task_id': task.id,
             'domain': domain,
             'status': 'started',
-            'redirect': f'/scan/progress/{task.id}'
+            'redirect': '/history'
         })
     except Exception as e:
         print(f"Error in scan endpoint: {e}")

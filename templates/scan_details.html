@@ -89,7 +89,11 @@
                                 <td class="status-{% if host.status_code|int < 300 %}2xx{% elif host.status_code|int < 400 %}3xx{% elif host.status_code|int < 500 %}4xx{% else %}5xx{% endif %}">{{ host.status_code }}</td>
                                 <td>{{ host.technology }}</td>
                                 <td>
-                                    <button class="view-button-sm" data-host-id="{{ host.id }}">View Ports</button>
+                                    <div class="action-buttons">
+                                        <button class="view-button-sm" data-host-id="{{ host.id }}">View Ports</button>
+                                        <button class="scan-button-sm" data-host-url="{{ host.url }}">Scan Ports</button>
+                                        <button class="gau-button-sm" data-host-url="{{ host.url }}">Run GAU</button>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -200,6 +204,76 @@
                         this.textContent = 'Error';
                         setTimeout(() => {
                             this.textContent = 'View Ports';
+                            this.disabled = false;
+                        }, 2000);
+                    });
+            });
+        });
+
+        // Handle port scan buttons
+        document.querySelectorAll('.scan-button-sm').forEach(button => {
+            button.addEventListener('click', function() {
+                const hostUrl = this.getAttribute('data-host-url');
+
+                // Show loading state
+                this.textContent = 'Scanning...';
+                this.disabled = true;
+
+                // Call the scan-ports API
+                fetch(`/api/scan-ports?host=${encodeURIComponent(hostUrl)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Reset button
+                        this.textContent = 'Scan Ports';
+                        this.disabled = false;
+
+                        // Show success message
+                        alert(`Port scan started for ${hostUrl}. Task ID: ${data.task_id}`);
+                    })
+                    .catch(error => {
+                        console.error('Error scanning ports:', error);
+                        this.textContent = 'Error';
+                        setTimeout(() => {
+                            this.textContent = 'Scan Ports';
+                            this.disabled = false;
+                        }, 2000);
+                    });
+            });
+        });
+
+        // Handle GAU buttons
+        document.querySelectorAll('.gau-button-sm').forEach(button => {
+            button.addEventListener('click', function() {
+                const hostUrl = this.getAttribute('data-host-url');
+                // Extract domain from URL
+                let domain = hostUrl;
+                try {
+                    const url = new URL(hostUrl);
+                    domain = url.hostname;
+                } catch (e) {
+                    console.error('Invalid URL:', hostUrl);
+                }
+
+                // Show loading state
+                this.textContent = 'Running...';
+                this.disabled = true;
+
+                // Call the run-gau API
+                fetch(`/api/run-gau?domain=${encodeURIComponent(domain)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Reset button
+                        this.textContent = 'Run GAU';
+                        this.disabled = false;
+
+                        // Show success message
+                        alert(`GAU scan started for ${domain}. Task ID: ${data.task_id}`);
+                    })
+                    .catch(error => {
+                        console.error('Error running GAU:', error);
+                        this.textContent = 'Error';
+                        setTimeout(() => {
+                            this.textContent = 'Run GAU';
                             this.disabled = false;
                         }, 2000);
                     });
