@@ -219,9 +219,18 @@
                 this.textContent = 'Scanning...';
                 this.disabled = true;
 
+                // Extract hostname from URL
+                let hostname = hostUrl;
+                try {
+                    const url = new URL(hostUrl);
+                    hostname = url.hostname;
+                } catch (e) {
+                    console.error('Invalid URL:', hostUrl);
+                }
+
                 // Call the scan-ports API
-                console.log(`Calling scan-ports API for host: ${hostUrl}`);
-                fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostUrl)}`)
+                console.log(`Calling scan-ports API for host: ${hostname}`);
+                fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
                     .then(response => {
                         console.log('Scan ports API response status:', response.status);
                         return response.json();
@@ -233,11 +242,11 @@
                         this.disabled = false;
 
                         // Show success message
-                        alert(`Port scan started for ${hostUrl}. Task ID: ${data.task_id || 'unknown'}`);
+                        alert(`Port scan started for ${hostname}. Task ID: ${data.task_id || 'unknown'}`);
 
                         // Poll for results
                         if (data.task_id) {
-                            pollTaskStatus(data.task_id, 'port', hostUrl);
+                            pollTaskStatus(data.task_id, 'port', hostname);
                         }
                     })
                     .catch(error => {
@@ -342,10 +351,22 @@
                             updateStatus('complete', 'Complete');
 
                             // Display the results based on task type
-                            if (taskType === 'gau' && data.urls) {
-                                showGauResults(target, data.urls, data.count);
+                            if (taskType === 'gau') {
+                                // For GAU, the data structure might be different
+                                if (data.urls) {
+                                    showGauResults(target, data.urls, data.count || data.urls.length);
+                                } else if (data.result && data.result.urls) {
+                                    // Alternative data structure
+                                    showGauResults(target, data.result.urls, data.result.count || data.result.urls.length);
+                                } else {
+                                    console.error('GAU results not found in data:', data);
+                                    updateStatus('error', 'Error: GAU results not found');
+                                }
                             } else if (taskType === 'port' && data.ports) {
                                 showPortsResults(target, data.ports);
+                            } else {
+                                console.error(`Unknown task type or missing data: ${taskType}`, data);
+                                updateStatus('error', 'Error: Unknown task type or missing data');
                             }
 
                             // Stop polling
