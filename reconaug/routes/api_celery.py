@@ -24,6 +24,53 @@ def debug_task(task_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@api_celery_bp.route('/task/<task_id>')
+def get_task(task_id):
+    """Get task details from Celery"""
+    try:
+        from reconaug.tasks import celery
+        task = celery.AsyncResult(task_id)
+
+        if task.state == 'PENDING':
+            response = {
+                'status': 'pending',
+                'progress': 0,
+                'message': 'Task is pending...'
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'status': 'error',
+                'progress': 100,
+                'message': str(task.info),
+                'complete': True
+            }
+        elif task.state == 'SUCCESS':
+            # For successful tasks, return the actual result
+            response = task.result
+
+            # Special handling for GAU results
+            if isinstance(response, dict) and 'urls' in response and isinstance(response['urls'], list):
+                # Make sure we're not returning too much data
+                if len(response['urls']) > 1000:
+                    response['urls'] = response['urls'][:1000]
+                    response['limited'] = True
+        else:
+            # For tasks in progress
+            response = task.info or {
+                'status': 'running',
+                'progress': 0,
+                'message': 'Task is running...'
+            }
+
+        return jsonify(response)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @api_celery_bp.route('/task/<task_id>/events')
 def task_events(task_id):
     """Server-sent events endpoint for real-time updates using Celery"""

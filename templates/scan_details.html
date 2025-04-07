@@ -349,18 +349,37 @@
 
                         if (data.status === 'complete') {
                             updateStatus('complete', 'Complete');
+                            console.log(`Task ${taskId} complete. Full data:`, JSON.stringify(data));
 
                             // Display the results based on task type
                             if (taskType === 'gau') {
+                                console.log('GAU task complete. Checking for URLs in data structure...');
+                                // Dump the entire data structure for debugging
+                                console.log('Data keys:', Object.keys(data));
+
                                 // For GAU, the data structure might be different
-                                if (data.urls) {
+                                if (data.urls && Array.isArray(data.urls)) {
+                                    console.log(`Found ${data.urls.length} URLs in data.urls`);
                                     showGauResults(target, data.urls, data.count || data.urls.length);
-                                } else if (data.result && data.result.urls) {
-                                    // Alternative data structure
+                                } else if (data.result && data.result.urls && Array.isArray(data.result.urls)) {
+                                    console.log(`Found ${data.result.urls.length} URLs in data.result.urls`);
                                     showGauResults(target, data.result.urls, data.result.count || data.result.urls.length);
                                 } else {
-                                    console.error('GAU results not found in data:', data);
-                                    updateStatus('error', 'Error: GAU results not found');
+                                    // Try to find URLs in any property
+                                    let foundUrls = false;
+                                    for (const key in data) {
+                                        if (Array.isArray(data[key]) && data[key].length > 0 && typeof data[key][0] === 'string') {
+                                            console.log(`Found potential URLs in data.${key}: ${data[key].length} items`);
+                                            showGauResults(target, data[key], data.count || data[key].length);
+                                            foundUrls = true;
+                                            break;
+                                        }
+                                    }
+
+                                    if (!foundUrls) {
+                                        console.error('GAU results not found in data:', data);
+                                        updateStatus('error', 'Error: GAU results not found');
+                                    }
                                 }
                             } else if (taskType === 'port' && data.ports) {
                                 showPortsResults(target, data.ports);
@@ -409,12 +428,34 @@
         // Function to show GAU results
         function showGauResults(domain, urls, count) {
             console.log(`Showing GAU results for ${domain}: ${count} URLs`);
+            console.log('First 5 URLs:', urls.slice(0, 5));
+
+            // Make sure we have a valid URLs array
+            if (!Array.isArray(urls)) {
+                console.error('URLs is not an array:', urls);
+                alert('Error: URLs data is not in the expected format');
+                return;
+            }
+
+            // Check if the Historical URLs tab exists
+            const tabButton = document.querySelector('.scan-tab-button[data-tab="historicalUrlsTab"]');
+            if (!tabButton) {
+                console.error('Historical URLs tab button not found');
+                alert('Error: Historical URLs tab not found');
+                return;
+            }
 
             // Switch to the Historical URLs tab
-            document.querySelector('.scan-tab-button[data-tab="historicalUrlsTab"]').click();
+            tabButton.click();
 
             // Update the table
             const table = document.getElementById('scanHistoricalUrlsTable');
+            if (!table) {
+                console.error('Historical URLs table not found');
+                alert('Error: Historical URLs table not found');
+                return;
+            }
+
             const tbody = table.querySelector('tbody') || table;
 
             // Clear existing content
@@ -428,14 +469,31 @@
                 row.appendChild(cell);
                 tbody.appendChild(row);
             } else {
+                // Process each URL
                 urls.forEach(url => {
+                    // Skip if not a string
+                    if (typeof url !== 'string') {
+                        console.warn('Skipping non-string URL:', url);
+                        return;
+                    }
+
+                    // Create table row
                     const row = document.createElement('tr');
                     const cell = document.createElement('td');
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.textContent = url;
-                    link.target = '_blank';
-                    cell.appendChild(link);
+
+                    try {
+                        // Try to create a link
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.textContent = url;
+                        link.target = '_blank';
+                        cell.appendChild(link);
+                    } catch (e) {
+                        // Fallback to plain text if URL is invalid
+                        console.warn('Error creating link for URL:', url, e);
+                        cell.textContent = url;
+                    }
+
                     row.appendChild(cell);
                     tbody.appendChild(row);
                 });
@@ -451,6 +509,12 @@
                     tbody.appendChild(row);
                 }
             }
+
+            // Scroll to the table
+            table.scrollIntoView({ behavior: 'smooth' });
+
+            // Show a success message
+            alert(`Successfully loaded ${urls.length} historical URLs for ${domain}`);
         }
 
         // Function to show port scan results
