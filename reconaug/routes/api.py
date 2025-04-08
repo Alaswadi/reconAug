@@ -86,8 +86,32 @@ def check_host_ports():
         if not host_url:
             return jsonify({'error': 'URL parameter is required'}), 400
 
-        # Find the host in the database
-        host = LiveHost.query.filter_by(url=host_url).first()
+        # Normalize the URL for comparison
+        normalized_url = host_url
+
+        # Try different URL formats
+        possible_urls = [host_url]  # Start with the original URL
+
+        # If URL has a protocol, add version without protocol
+        if '://' in host_url:
+            domain = host_url.split('://', 1)[1]
+            if domain.endswith('/'):
+                domain = domain[:-1]  # Remove trailing slash
+            possible_urls.append(domain)
+        else:
+            # If URL doesn't have a protocol, add versions with protocols
+            possible_urls.append(f"http://{host_url}")
+            possible_urls.append(f"https://{host_url}")
+
+        print(f"Checking for host with URLs: {possible_urls}")
+
+        # Try to find the host with any of the possible URLs
+        host = None
+        for url in possible_urls:
+            host = LiveHost.query.filter_by(url=url).first()
+            if host:
+                print(f"Found host with URL: {url}")
+                break
 
         if not host:
             return jsonify({

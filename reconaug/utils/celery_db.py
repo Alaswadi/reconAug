@@ -68,8 +68,32 @@ def save_port_scan_results(host_url, ports):
         with app.app_context():
             from reconaug import db
 
-            # Find the live host record
-            host = LiveHost.query.filter_by(url=host_url).first()
+            # Normalize the URL for comparison
+            normalized_url = host_url
+
+            # Try different URL formats
+            possible_urls = [host_url]  # Start with the original URL
+
+            # If URL has a protocol, add version without protocol
+            if '://' in host_url:
+                domain = host_url.split('://', 1)[1]
+                if domain.endswith('/'):
+                    domain = domain[:-1]  # Remove trailing slash
+                possible_urls.append(domain)
+            else:
+                # If URL doesn't have a protocol, add versions with protocols
+                possible_urls.append(f"http://{host_url}")
+                possible_urls.append(f"https://{host_url}")
+
+            print(f"Checking for host with URLs: {possible_urls}")
+
+            # Try to find the host with any of the possible URLs
+            host = None
+            for url in possible_urls:
+                host = LiveHost.query.filter_by(url=url).first()
+                if host:
+                    print(f"Found host with URL: {url}")
+                    break
 
             # If host not found, try to create it
             if not host:

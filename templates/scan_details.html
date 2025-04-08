@@ -139,8 +139,23 @@
                 // Skip if we don't have a host URL
                 if (!hostUrl) return;
 
+                // Normalize URL for checking
+                let checkUrl = hostUrl;
+
+                // Remove protocol if present
+                if (checkUrl.includes('://')) {
+                    checkUrl = checkUrl.split('://', 1)[1];
+                }
+
+                // Remove trailing slash if present
+                if (checkUrl.endsWith('/')) {
+                    checkUrl = checkUrl.slice(0, -1);
+                }
+
+                console.log(`Checking ports for normalized URL: ${checkUrl}`);
+
                 // Check if this host has ports already scanned
-                fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
+                fetch(`/api/host/check-ports?url=${encodeURIComponent(checkUrl)}`)
                     .then(response => response.json())
                     .then(data => {
                         console.log(`Port check for ${hostUrl}:`, data);
@@ -247,8 +262,23 @@
                         console.error('Invalid URL:', hostUrl);
                     }
 
+                    // Normalize URL for checking
+                    let checkUrl = hostUrl;
+
+                    // Remove protocol if present
+                    if (checkUrl.includes('://')) {
+                        checkUrl = checkUrl.split('://', 1)[1];
+                    }
+
+                    // Remove trailing slash if present
+                    if (checkUrl.endsWith('/')) {
+                        checkUrl = checkUrl.slice(0, -1);
+                    }
+
+                    console.log(`Checking ports for normalized URL: ${checkUrl}`);
+
                     // Check if this host already has ports scanned
-                    fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
+                    fetch(`/api/host/check-ports?url=${encodeURIComponent(checkUrl)}`)
                         .then(response => response.json())
                         .then(data => {
                             if (data.has_ports && data.host_id) {
