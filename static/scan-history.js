@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
             viewButton.className = 'view-button-sm';
             viewButton.addEventListener('click', function() {
                 // Navigate to the scan details page
-                window.location.href = `/scan/scan-details/${scan.id}`;
+                window.location.href = `/scan/details/${scan.id}`;
             });
 
             // Rescan button

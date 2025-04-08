@@ -10,7 +10,7 @@
     <div class="content-header">
         <h2>Start a New Scan</h2>
     </div>
-    
+
     <div class="scan-form">
         <form id="scanForm" action="/scan" method="post">
             <div class="form-group">
@@ -22,7 +22,7 @@
             </div>
         </form>
     </div>
-    
+
     <div id="scanStatus" class="scan-status hidden">
         <div class="spinner"></div>
         <p id="statusMessage">Starting scan...</p>
@@ -34,7 +34,7 @@
         <h2>Recent Scans</h2>
         <a href="{{ url_for('main.history') }}" class="view-all-button"><i class="fas fa-list"></i> View All</a>
     </div>
-    
+
     <table>
         <thead>
             <tr>
@@ -61,7 +61,7 @@
         const scanStatus = document.getElementById('scanStatus');
         const statusMessage = document.getElementById('statusMessage');
         const recentScansTable = document.getElementById('recentScansTable');
-        
+
         // Load recent scans
         fetch('/api/scans?limit=5')
             .then(response => response.json())
@@ -89,18 +89,18 @@
                 console.error('Error loading recent scans:', error);
                 recentScansTable.innerHTML = '<tr><td colspan="5" class="text-center">Error loading recent scans</td></tr>';
             });
-        
+
         // Handle form submission
         scanForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            
+
             const domain = document.getElementById('domain').value;
             if (!domain) return;
-            
+
             // Show loading state
             scanStatus.classList.remove('hidden');
             statusMessage.textContent = 'Starting scan...';
-            
+
             // Submit the form via AJAX
             fetch('/scan', {
                 method: 'POST',

@@ -119,8 +119,8 @@ def task_status(task_id):
             'message': str(e)
         }), 500
 
-@scan_bp.route('/scan-details/<int:scan_id>')
-def scan_details_page(scan_id):
+@scan_bp.route('/details/<int:scan_id>')
+def details(scan_id):
     """Page to display details of a specific scan"""
     try:
         scan = Scan.query.get_or_404(scan_id)
