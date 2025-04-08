@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}ReconAug Dashboard{% endblock %}
+
+{% block header_title %}<i class="fas fa-search"></i> ReconAug{% endblock %}
+{% block header_subtitle %}Advanced Reconnaissance Tool{% endblock %}
+
+{% block content %}
+<div class="content-box">
+    <div class="content-header">
+        <h2>Start a New Scan</h2>
+    </div>
+    
+    <div class="scan-form">
+        <form id="scanForm" action="/scan" method="post">
+            <div class="form-group">
+                <label for="domain">Domain:</label>
+                <div class="input-group">
+                    <input type="text" id="domain" name="domain" placeholder="example.com" required>
+                    <button type="submit" id="scanButton">Scan</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div id="scanStatus" class="scan-status hidden">
+        <div class="spinner"></div>
+        <p id="statusMessage">Starting scan...</p>
+    </div>
+</div>
+
+<div class="content-box">
+    <div class="content-header">
+        <h2>Recent Scans</h2>
+        <a href="{{ url_for('main.history') }}" class="view-all-button"><i class="fas fa-list"></i> View All</a>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Domain</th>
+                <th>Date</th>
+                <th>Subdomains</th>
+                <th>Live Hosts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="recentScansTable">
+            <tr>
+                <td colspan="5" class="text-center">Loading recent scans...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const scanForm = document.getElementById('scanForm');
+        const scanStatus = document.getElementById('scanStatus');
+        const statusMessage = document.getElementById('statusMessage');
+        const recentScansTable = document.getElementById('recentScansTable');
+        
+        // Load recent scans
+        fetch('/api/scans?limit=5')
+            .then(response => response.json())
+            .then(data => {
+                if (data.scans && data.scans.length > 0) {
+                    recentScansTable.innerHTML = '';
+                    data.scans.forEach(scan => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${scan.domain}</td>
+                            <td>${new Date(scan.timestamp).toLocaleString()}</td>
+                            <td>${scan.subdomains_count}</td>
+                            <td>${scan.live_hosts_count}</td>
+                            <td>
+                                <a href="/scan/details/${scan.id}" class="view-button-sm">View Details</a>
+                            </td>
+                        `;
+                        recentScansTable.appendChild(row);
+                    });
+                } else {
+                    recentScansTable.innerHTML = '<tr><td colspan="5" class="text-center">No scans found</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading recent scans:', error);
+                recentScansTable.innerHTML = '<tr><td colspan="5" class="text-center">Error loading recent scans</td></tr>';
+            });
+        
+        // Handle form submission
+        scanForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const domain = document.getElementById('domain').value;
+            if (!domain) return;
+            
+            // Show loading state
+            scanStatus.classList.remove('hidden');
+            statusMessage.textContent = 'Starting scan...';
+            
+            // Submit the form via AJAX
+            fetch('/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ domain }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.redirect) {
+                    // Redirect to the specified URL
+                    window.location.href = data.redirect;
+                } else {
+                    // Show error message
+                    statusMessage.textContent = data.error || 'Unknown error';
+                    setTimeout(() => {
+                        scanStatus.classList.add('hidden');
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.textContent = 'Error starting scan';
+                setTimeout(() => {
+                    scanStatus.classList.add('hidden');
+                }, 3000);
+            });
+        });
+    });
+</script>
+{% endblock %}

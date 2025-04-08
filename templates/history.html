@@ -1,47 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scan History - Subdomains Finder</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-history"></i> Scan History</h1>
-            <p>View past reconnaissance scans</p>
-            <div class="nav-links">
-                <a href="{{ url_for('main.index') }}" class="nav-link"><i class="fas fa-home"></i> Home</a>
-            </div>
-        </header>
+{% extends "base.html" %}
 
-        <div class="content-box">
-            <div class="search-filter-container">
-                <div class="search-filter">
-                    <input type="text" id="scanHistoryFilter" placeholder="Filter by domain...">
-                </div>
-                <div class="refresh-button-container">
-                    <button id="refreshButton" class="refresh-button"><i class="fas fa-sync-alt"></i> Refresh</button>
-                    <button id="clearDatabaseButton" class="clear-button"><i class="fas fa-trash-alt"></i> Clear Database</button>
-                </div>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Domain</th>
-                        <th>Date</th>
-                        <th>Subdomains</th>
-                        <th>Live Hosts</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="scanHistoryTable"></tbody>
-            </table>
+{% block title %}Scan History{% endblock %}
+
+{% block header_title %}<i class="fas fa-history"></i> Scan History{% endblock %}
+{% block header_subtitle %}View past reconnaissance scans{% endblock %}
+
+{% block content %}
+<div class="content-box">
+    <div class="search-filter-container">
+        <div class="search-filter">
+            <input type="text" id="scanHistoryFilter" placeholder="Filter by domain...">
+        </div>
+        <div class="refresh-button-container">
+            <button id="refreshButton" class="refresh-button"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button id="clearDatabaseButton" class="clear-button"><i class="fas fa-trash-alt"></i> Clear Database</button>
         </div>
     </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Domain</th>
+                <th>Date</th>
+                <th>Subdomains</th>
+                <th>Live Hosts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="scanHistoryTable"></tbody>
+    </table>
+</div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='scan-history.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='scan-history.js') }}"></script>
+{% endblock %}

@@ -2,11 +2,14 @@
 
 {% block title %}Scan Details{% endblock %}
 
+{% block header_title %}<i class="fas fa-info-circle"></i> Scan Details{% endblock %}
+{% block header_subtitle %}Detailed information about your scan{% endblock %}
+
 {% block content %}
-<div class="container">
-    <div class="header">
-        <h1>Scan Details</h1>
-        <a href="/history" class="back-button">Back to History</a>
+<div class="content-box">
+    <div class="content-header">
+        <h2>Scan Details</h2>
+        <a href="{{ url_for('main.history') }}" class="back-button"><i class="fas fa-arrow-left"></i> Back to History</a>
     </div>
 
     <div class="content">
@@ -132,16 +135,16 @@
             document.querySelectorAll('.scan-button-sm').forEach(button => {
                 const hostUrl = button.getAttribute('data-host-url');
                 const hostId = button.getAttribute('data-host-id');
-                
+
                 // Skip if we don't have a host URL
                 if (!hostUrl) return;
-                
+
                 // Check if this host has ports already scanned
                 fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
                     .then(response => response.json())
                     .then(data => {
                         console.log(`Port check for ${hostUrl}:`, data);
-                        
+
                         if (data.has_ports) {
                             // Host has ports, change button color to blue and text to "View Ports"
                             button.classList.add('has-data');
@@ -163,14 +166,14 @@
         // Initialize all event handlers when the DOM is fully loaded
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing event handlers');
-            
+
             // 1. Set up tab switching
             document.querySelectorAll('.scan-tab-button').forEach(button => {
                 button.onclick = function() {
                     // Get the tab ID
                     const tabId = this.getAttribute('data-tab');
                     console.log('Tab clicked:', tabId);
-                    
+
                     // Remove active class from all buttons and panes
                     document.querySelectorAll('.scan-tab-button').forEach(btn => {
                         btn.classList.remove('active');
@@ -178,28 +181,28 @@
                     document.querySelectorAll('.scan-tab-pane').forEach(pane => {
                         pane.classList.remove('active');
                     });
-                    
+
                     // Add active class to this button and its pane
                     this.classList.add('active');
                     const pane = document.getElementById(tabId);
                     if (pane) {
                         pane.classList.add('active');
                     }
-                    
+
                     return false; // Prevent default
                 };
             });
-            
+
             // 2. Set up view ports buttons
             document.querySelectorAll('.view-button-sm').forEach(button => {
                 button.onclick = function() {
                     const hostId = this.getAttribute('data-host-id');
                     console.log('View ports clicked for host ID:', hostId);
-                    
+
                     // Show loading state
                     this.textContent = 'Loading...';
                     this.disabled = true;
-                    
+
                     // Fetch ports data
                     fetch(`/api/host/${hostId}/ports`)
                         .then(response => response.json())
@@ -207,7 +210,7 @@
                             // Reset button
                             this.textContent = 'View Ports';
                             this.disabled = false;
-                            
+
                             // Show ports modal
                             showPortsModal(data.host.url, data.ports);
                         })
@@ -219,22 +222,22 @@
                                 this.disabled = false;
                             }, 2000);
                         });
-                        
+
                     return false; // Prevent default
                 };
             });
-            
+
             // 3. Set up scan ports buttons
             document.querySelectorAll('.scan-button-sm').forEach(button => {
                 button.onclick = function() {
                     const hostUrl = this.getAttribute('data-host-url');
                     const hostId = this.getAttribute('data-host-id');
                     console.log('Scan ports clicked for host:', hostUrl);
-                    
+
                     // Show loading state
                     this.textContent = 'Loading...';
                     this.disabled = true;
-                    
+
                     // Extract hostname from URL
                     let hostname = hostUrl;
                     try {
@@ -243,7 +246,7 @@
                     } catch (e) {
                         console.error('Invalid URL:', hostUrl);
                     }
-                    
+
                     // Check if this host already has ports scanned
                     fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
                         .then(response => response.json())
@@ -252,7 +255,7 @@
                                 // Host has ports, show them
                                 this.textContent = 'View Ports';
                                 this.disabled = false;
-                                
+
                                 fetch(`/api/host/${data.host_id}/ports`)
                                     .then(response => response.json())
                                     .then(portsData => {
@@ -265,7 +268,7 @@
                             } else {
                                 // No ports, start a scan
                                 this.textContent = 'Scanning...';
-                                
+
                                 fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
                                     .then(response => response.json())
                                     .then(data => {
@@ -288,21 +291,21 @@
                             this.textContent = 'Error';
                             this.disabled = false;
                         });
-                        
+
                     return false; // Prevent default
                 };
             });
-            
+
             // 4. Set up GAU buttons
             document.querySelectorAll('.gau-button-sm').forEach(button => {
                 button.onclick = function() {
                     const hostUrl = this.getAttribute('data-host-url');
                     console.log('GAU clicked for host:', hostUrl);
-                    
+
                     // Show loading state
                     this.textContent = 'Running...';
                     this.disabled = true;
-                    
+
                     // Extract domain from URL
                     let domain = hostUrl;
                     try {
@@ -311,7 +314,7 @@
                     } catch (e) {
                         console.error('Invalid URL:', hostUrl);
                     }
-                    
+
                     // Call the run-gau API
                     fetch(`/api/celery/run-gau?domain=${encodeURIComponent(domain)}`)
                         .then(response => response.json())
@@ -319,7 +322,7 @@
                             // Reset button
                             this.textContent = 'Run GAU';
                             this.disabled = false;
-                            
+
                             // Show success message
                             alert(`GAU scan started for ${domain}. Task ID: ${data.task_id || 'unknown'}`);
                         })
@@ -331,11 +334,11 @@
                                 this.disabled = false;
                             }, 2000);
                         });
-                        
+
                     return false; // Prevent default
                 };
             });
-            
+
             // 5. Set up filtering
             const setupFilter = (filterId, tableSelector, rowSelector) => {
                 const filter = document.getElementById(filterId);
@@ -353,15 +356,15 @@
                     };
                 }
             };
-            
+
             // Set up filters for each tab
             setupFilter('scanSubdomainsFilter', '#scanSubdomainsTable');
             setupFilter('scanLiveHostsFilter', '#scanLiveHostsTable');
             setupFilter('scanHistoricalUrlsFilter', '#scanHistoricalUrlsTable');
-            
+
             // 6. Check for existing ports and update button colors
             checkExistingPorts();
-            
+
             // 7. Ensure Live Hosts tab is active
             const liveHostsButton = document.querySelector('.scan-tab-button[data-tab="scanLiveHosts"]');
             if (liveHostsButton) {
@@ -372,7 +375,7 @@
         // Function to show ports modal
         function showPortsModal(host, ports) {
             console.log('Showing ports modal for', host, 'with ports:', ports);
-            
+
             // Create modal if it doesn't exist
             let modal = document.getElementById('portsModal');
             if (!modal) {
@@ -380,31 +383,31 @@
                 modal = document.createElement('div');
                 modal.id = 'portsModal';
                 modal.className = 'modal';
-                
+
                 const modalContent = document.createElement('div');
                 modalContent.className = 'modal-content';
-                
+
                 const closeButton = document.createElement('span');
                 closeButton.className = 'close-button';
                 closeButton.innerHTML = '&times;';
                 closeButton.onclick = function() {
                     modal.classList.add('hidden');
                 };
-                
+
                 const modalTitle = document.createElement('h2');
                 modalTitle.id = 'portsModalTitle';
-                
+
                 const modalBody = document.createElement('div');
                 modalBody.id = 'portsModalContent';
-                
+
                 modalContent.appendChild(closeButton);
                 modalContent.appendChild(modalTitle);
                 modalContent.appendChild(modalBody);
                 modal.appendChild(modalContent);
-                
+
                 // Add modal to the page
                 document.body.appendChild(modal);
-                
+
                 // Close modal when clicking outside
                 modal.onclick = function(event) {
                     if (event.target === modal) {
@@ -412,7 +415,7 @@
                     }
                 };
             }
-            
+
             const title = document.getElementById('portsModalTitle');
             const content = document.getElementById('portsModalContent');
 
@@ -428,7 +431,7 @@
                 ports.forEach(port => {
                     // Handle different port data formats
                     let portNumber, service;
-                    
+
                     if (typeof port === 'number') {
                         // If port is just a number
                         portNumber = port;
@@ -442,10 +445,10 @@
                         portNumber = 'Unknown';
                         service = 'Unknown';
                     }
-                    
+
                     html += `<tr><td>${portNumber}</td><td>${service}</td></tr>`;
                 });
-                
+
                 html += '</tbody></table>';
                 content.innerHTML = html;
             }
@@ -455,4 +458,10 @@
         }
     </script>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Additional scripts can be added here
+</script>
 {% endblock %}
