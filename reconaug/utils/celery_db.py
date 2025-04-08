@@ -70,9 +70,43 @@ def save_port_scan_results(host_url, ports):
 
             # Find the live host record
             host = LiveHost.query.filter_by(url=host_url).first()
+
+            # If host not found, try to create it
             if not host:
-                print(f"Live host {host_url} not found in database")
-                return False
+                print(f"Live host {host_url} not found in database, creating new entry")
+
+                # Extract domain from URL
+                domain = host_url
+                if '://' in host_url:
+                    domain = host_url.split('://', 1)[1].split('/', 1)[0]
+                if ':' in domain:
+                    domain = domain.split(':', 1)[0]
+
+                # Find the most recent scan for this domain
+                scan = db.session.query(Scan).filter(Scan.domain.like(f'%{domain}%')).order_by(Scan.timestamp.desc()).first()
+
+                if not scan:
+                    print(f"No scan found for domain {domain}, creating new scan record")
+                    scan = Scan(
+                        domain=domain,
+                        timestamp=datetime.utcnow(),
+                        status='complete',
+                        subdomains_count=0,
+                        live_hosts_count=1
+                    )
+                    db.session.add(scan)
+                    db.session.flush()  # Get the scan ID without committing
+
+                # Create new live host record
+                host = LiveHost(
+                    scan_id=scan.id,
+                    url=host_url,
+                    status_code='200',  # Default status code
+                    technology='Unknown'
+                )
+                db.session.add(host)
+                db.session.flush()  # Get the host ID without committing
+                print(f"Created new live host record with ID: {host.id}")
 
             # Add ports
             for port in ports:
