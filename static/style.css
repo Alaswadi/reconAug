@@ -510,29 +510,55 @@ a:hover {
     border-bottom: 1px solid var(--border-color);
     margin-top: 20px;
     margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 .scan-tab-button {
     flex: 1;
-    background-color: #f1f1f1;
+    background-color: #f8f9fa;
     border: none;
-    padding: 10px;
+    padding: 12px 15px;
     cursor: pointer;
-    border-radius: 0;
-    transition: background-color 0.3s;
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    color: #495057;
+    position: relative;
+    margin-right: 2px;
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.05);
+    border: 1px solid #dee2e6;
+    border-bottom: none;
 }
 
 .scan-tab-button:hover {
-    background-color: #ddd;
+    background-color: #e9ecef;
+    color: var(--primary-color);
 }
 
 .scan-tab-button.active {
     background-color: white;
+    color: var(--primary-color);
     border-bottom: 3px solid var(--primary-color);
+    font-weight: bold;
+    z-index: 2;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+}
+
+.scan-tab-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .scan-tab-content {
-    padding: 20px 0;
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    position: relative;
+    z-index: 1;
 }
 
 .scan-tab-pane {
@@ -686,13 +712,17 @@ a:hover {
 }
 
 .view-button-sm, .scan-button-sm, .gau-button-sm {
-    padding: 5px 8px;
+    padding: 6px 10px;
     font-size: 12px;
     border: none;
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
     color: white;
-    transition: background-color 0.3s;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    font-weight: 500;
+    min-width: 80px;
+    text-align: center;
 }
 
 .view-button-sm {
@@ -708,18 +738,44 @@ a:hover {
 }
 
 .view-button-sm:hover, .scan-button-sm:hover, .gau-button-sm:hover {
-    opacity: 0.8;
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.12);
+}
+
+.view-button-sm:active, .scan-button-sm:active, .gau-button-sm:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.12);
 }
 
 .view-button-sm:disabled, .scan-button-sm:disabled, .gau-button-sm:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
 }
 
 /* Button with data already available */
 .scan-button-sm.has-data {
     background-color: #2196F3; /* Blue */
-    border: 2px solid #0b7dda;
+    border: 1px solid #0b7dda;
+    position: relative;
+}
+
+.scan-button-sm.has-data::after {
+    content: '✓';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Task status indicators */
@@ -771,4 +827,90 @@ a:hover {
 .status-timeout {
     background-color: var(--warning-color); /* Orange */
     color: white;
+}
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+/* Modal styling */
+.modal {
+    display: flex;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.modal.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 25px;
+    border-radius: 8px;
+    max-width: 80%;
+    max-height: 80%;
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transform: scale(1);
+    transition: transform 0.3s ease;
+}
+
+.modal.hidden .modal-content {
+    transform: scale(0.9);
+}
+
+.close-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #aaa;
+    transition: color 0.2s ease;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.close-button:hover {
+    color: var(--danger-color);
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.port-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.port-table th, .port-table td {
+    padding: 10px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.port-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.port-table tr:hover {
+    background-color: #f8f9fa;
 }
