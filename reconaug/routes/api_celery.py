@@ -31,36 +31,60 @@ def get_task(task_id):
         from reconaug.tasks import celery
         task = celery.AsyncResult(task_id)
 
+        print(f"Task {task_id} state: {task.state}, info: {task.info}, result: {task.result}")
+
+        # Start with a basic response structure
+        response = {
+            'task_id': task_id,
+            'state': task.state
+        }
+
         if task.state == 'PENDING':
-            response = {
+            response.update({
                 'status': 'pending',
                 'progress': 0,
                 'message': 'Task is pending...'
-            }
+            })
         elif task.state == 'FAILURE':
-            response = {
+            response.update({
                 'status': 'error',
                 'progress': 100,
                 'message': str(task.info),
                 'complete': True
-            }
+            })
         elif task.state == 'SUCCESS':
             # For successful tasks, return the actual result
-            response = task.result
+            if isinstance(task.result, dict):
+                response.update(task.result)
 
-            # Special handling for GAU results
-            if isinstance(response, dict) and 'urls' in response and isinstance(response['urls'], list):
-                # Make sure we're not returning too much data
-                if len(response['urls']) > 1000:
-                    response['urls'] = response['urls'][:1000]
-                    response['limited'] = True
+                # Make sure we have a status field
+                if 'status' not in response:
+                    response['status'] = 'complete'
+
+                # Special handling for GAU results
+                if 'urls' in response and isinstance(response['urls'], list):
+                    # Make sure we're not returning too much data
+                    if len(response['urls']) > 1000:
+                        response['urls'] = response['urls'][:1000]
+                        response['limited'] = True
+            else:
+                # If result is not a dict, create a basic response
+                response.update({
+                    'status': 'complete',
+                    'progress': 100,
+                    'message': 'Task completed',
+                    'result': str(task.result)
+                })
         else:
             # For tasks in progress
-            response = task.info or {
-                'status': 'running',
-                'progress': 0,
-                'message': 'Task is running...'
-            }
+            if task.info and isinstance(task.info, dict):
+                response.update(task.info)
+            else:
+                response.update({
+                    'status': 'running',
+                    'progress': 0,
+                    'message': 'Task is running...'
+                })
 
         return jsonify(response)
     except Exception as e:

@@ -414,26 +414,69 @@
         function pollTaskStatus(taskId, hostname, button) {
             console.log(`Polling task status for ${taskId}`);
 
+            // Add a timeout to stop polling after 60 seconds
+            let pollCount = 0;
+            const maxPolls = 30; // 30 polls * 2 seconds = 60 seconds max
+
             // Poll every 2 seconds
             const pollInterval = setInterval(() => {
+                pollCount++;
+                console.log(`Poll attempt ${pollCount} for task ${taskId}`);
+
+                // Stop polling after maxPolls attempts
+                if (pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                    console.error(`Polling timeout for task ${taskId} after ${maxPolls} attempts`);
+                    button.textContent = 'Timeout';
+                    button.disabled = false;
+                    setTimeout(() => {
+                        button.textContent = 'Scan Ports';
+                    }, 2000);
+                    return;
+                }
+
                 fetch(`/api/celery/task/${taskId}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         console.log(`Task status for ${taskId}:`, data);
 
-                        if (data.status === 'complete' || data.status === 'error') {
+                        // Check if we have a valid response
+                        if (!data) {
+                            console.error(`Invalid response data for task ${taskId}`);
+                            return;
+                        }
+
+                        // Handle different response formats
+                        let status = data.status;
+                        let ports = [];
+
+                        // Extract ports from different response formats
+                        if (data.ports && Array.isArray(data.ports)) {
+                            ports = data.ports;
+                        } else if (data.result && data.result.ports && Array.isArray(data.result.ports)) {
+                            ports = data.result.ports;
+                        }
+
+                        console.log(`Extracted status: ${status}, ports:`, ports);
+
+                        if (status === 'complete' || status === 'error' || data.state === 'SUCCESS' || data.state === 'FAILURE') {
                             // Clear the interval
                             clearInterval(pollInterval);
 
-                            if (data.status === 'complete') {
+                            if (status === 'complete' || data.state === 'SUCCESS') {
                                 // Update button to View Ports
                                 button.textContent = 'View Ports';
                                 button.disabled = false;
                                 button.classList.add('has-data');
 
                                 // Show the ports modal
-                                if (data.ports && data.ports.length > 0) {
-                                    showPortsModal(hostname, data.ports);
+                                if (ports.length > 0) {
+                                    showPortsModal(hostname, ports);
                                 } else {
                                     alert(`No open ports found for ${hostname}`);
                                 }
