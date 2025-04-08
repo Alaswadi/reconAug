@@ -91,7 +91,7 @@
                                 <td>
                                     <div class="action-buttons">
                                         <button class="view-button-sm" data-host-id="{{ host.id }}">View Ports</button>
-                                        <button class="scan-button-sm" data-host-url="{{ host.url }}">Scan Ports</button>
+                                        <button class="scan-button-sm" data-host-url="{{ host.url }}" data-host-id="{{ host.id }}">Scan Ports</button>
                                         <button class="gau-button-sm" data-host-url="{{ host.url }}">Run GAU</button>
                                     </div>
                                 </td>
@@ -134,6 +134,43 @@
     </div>
 
     <script>
+        // Check for existing ports and update button colors
+        function checkExistingPorts() {
+            // Get all scan port buttons
+            document.querySelectorAll('.scan-button-sm').forEach(button => {
+                const hostUrl = button.getAttribute('data-host-url');
+                const hostId = button.getAttribute('data-host-id');
+
+                // Skip if we don't have a host URL
+                if (!hostUrl) return;
+
+                // Check if this host has ports already scanned
+                fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(`Port check for ${hostUrl}:`, data);
+
+                        if (data.has_ports) {
+                            // Host has ports, change button color to green
+                            button.classList.add('has-data');
+                            button.title = `${data.ports_count} ports already scanned`;
+                        } else {
+                            // Host doesn't have ports, keep default color
+                            button.classList.remove('has-data');
+                            button.title = 'No ports scanned yet';
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error checking ports for ${hostUrl}:`, error);
+                    });
+            });
+        }
+
+        // Run the check when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            checkExistingPorts();
+        });
+
         // Handle tab switching
         document.querySelectorAll('.scan-tab-button').forEach(button => {
             button.addEventListener('click', function() {
@@ -246,7 +283,10 @@
 
                         // Poll for results
                         if (data.task_id) {
-                            pollTaskStatus(data.task_id, 'port', hostname);
+                            pollTaskStatus(data.task_id, 'port', hostname, () => {
+                                // After task completes, refresh the button color
+                                setTimeout(checkExistingPorts, 1000);
+                            });
                         }
                     })
                     .catch(error => {
@@ -310,7 +350,7 @@
         });
 
         // Function to poll task status and display results when ready
-        function pollTaskStatus(taskId, taskType, target) {
+        function pollTaskStatus(taskId, taskType, target, callback) {
             console.log(`Polling status for ${taskType} task ${taskId} for ${target}`);
 
             // Create a status indicator
@@ -409,6 +449,11 @@
                             } else {
                                 console.error(`Unknown task type or missing data: ${taskType}`, data);
                                 updateStatus('error', 'Error: Unknown task type or missing data');
+                            }
+
+                            // Execute callback if provided
+                            if (typeof callback === 'function') {
+                                callback();
                             }
 
                             // Stop polling

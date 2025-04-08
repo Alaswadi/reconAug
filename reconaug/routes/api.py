@@ -72,7 +72,38 @@ def host_ports(host_id):
 
         return jsonify({
             'host': host.to_dict(),
-            'ports': ports
+            'ports': ports,
+            'has_ports': len(ports) > 0
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/host/check-ports')
+def check_host_ports():
+    """Check if a host has ports scanned"""
+    try:
+        host_url = request.args.get('url')
+        if not host_url:
+            return jsonify({'error': 'URL parameter is required'}), 400
+
+        # Find the host in the database
+        host = LiveHost.query.filter_by(url=host_url).first()
+
+        if not host:
+            return jsonify({
+                'url': host_url,
+                'has_ports': False,
+                'message': 'Host not found in database'
+            })
+
+        # Check if the host has ports
+        ports_count = Port.query.filter_by(host_id=host.id).count()
+
+        return jsonify({
+            'url': host_url,
+            'host_id': host.id,
+            'has_ports': ports_count > 0,
+            'ports_count': ports_count
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

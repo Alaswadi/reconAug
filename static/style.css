@@ -716,6 +716,12 @@ a:hover {
     cursor: not-allowed;
 }
 
+/* Button with data already available */
+.scan-button-sm.has-data {
+    background-color: #4CAF50; /* Bright green */
+    border: 2px solid #45a049;
+}
+
 /* Task status indicators */
 .task-status-indicator {
     margin: 5px 0;
