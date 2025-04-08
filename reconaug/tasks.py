@@ -228,13 +228,54 @@ def run_port_scan_task(self, host):
         # Save ports to database
         success = save_port_scan_results(host, ports)
 
+        # Convert port numbers to port objects with service information
+        port_objects = []
+        for port in ports:
+            service = 'Unknown'
+            # Add common service names
+            if port == 21:
+                service = 'FTP'
+            elif port == 22:
+                service = 'SSH'
+            elif port == 23:
+                service = 'Telnet'
+            elif port == 25:
+                service = 'SMTP'
+            elif port == 53:
+                service = 'DNS'
+            elif port == 80:
+                service = 'HTTP'
+            elif port == 110:
+                service = 'POP3'
+            elif port == 143:
+                service = 'IMAP'
+            elif port == 443:
+                service = 'HTTPS'
+            elif port == 445:
+                service = 'SMB'
+            elif port == 3306:
+                service = 'MySQL'
+            elif port == 3389:
+                service = 'RDP'
+            elif port == 5432:
+                service = 'PostgreSQL'
+            elif port == 8080:
+                service = 'HTTP-Proxy'
+            elif port == 8443:
+                service = 'HTTPS-Alt'
+
+            port_objects.append({
+                'port_number': port,
+                'service': service
+            })
+
         return {
             'status': 'complete',
             'progress': 100,
             'message': f'Found {len(ports)} open ports for {host}',
             'host': host,
             'count': len(ports),
-            'ports': ports
+            'ports': port_objects
         }
     except Exception as e:
         import traceback

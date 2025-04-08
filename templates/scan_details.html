@@ -662,7 +662,48 @@
 
         // Function to show ports modal
         function showPortsModal(host, ports) {
-            const modal = document.getElementById('portsModal');
+            console.log('Showing ports modal for', host, 'with ports:', ports);
+
+            // Create modal if it doesn't exist
+            let modal = document.getElementById('portsModal');
+            if (!modal) {
+                console.log('Creating ports modal');
+                modal = document.createElement('div');
+                modal.id = 'portsModal';
+                modal.className = 'modal';
+
+                const modalContent = document.createElement('div');
+                modalContent.className = 'modal-content';
+
+                const closeButton = document.createElement('span');
+                closeButton.className = 'close-button';
+                closeButton.innerHTML = '&times;';
+                closeButton.onclick = function() {
+                    modal.classList.add('hidden');
+                };
+
+                const modalTitle = document.createElement('h2');
+                modalTitle.id = 'portsModalTitle';
+
+                const modalBody = document.createElement('div');
+                modalBody.id = 'portsModalContent';
+
+                modalContent.appendChild(closeButton);
+                modalContent.appendChild(modalTitle);
+                modalContent.appendChild(modalBody);
+                modal.appendChild(modalContent);
+
+                // Add modal to the page
+                document.body.appendChild(modal);
+
+                // Close modal when clicking outside
+                modal.onclick = function(event) {
+                    if (event.target === modal) {
+                        modal.classList.add('hidden');
+                    }
+                };
+            }
+
             const title = document.getElementById('portsModalTitle');
             const content = document.getElementById('portsModalContent');
 
@@ -670,13 +711,30 @@
             title.textContent = `Open Ports on ${host}`;
 
             // Create content
-            if (ports.length === 0) {
+            if (!ports || ports.length === 0) {
                 content.innerHTML = '<p>No open ports found</p>';
             } else {
                 let html = '<table class="port-table"><thead><tr><th>Port</th><th>Service</th></tr></thead><tbody>';
 
                 ports.forEach(port => {
-                    html += `<tr><td>${port.port}</td><td>${port.service || 'Unknown'}</td></tr>`;
+                    // Handle different port data formats
+                    let portNumber, service;
+
+                    if (typeof port === 'number') {
+                        // If port is just a number
+                        portNumber = port;
+                        service = 'Unknown';
+                    } else if (typeof port === 'object') {
+                        // If port is an object, extract properties
+                        portNumber = port.port_number || port.port || port;
+                        service = port.service || 'Unknown';
+                    } else {
+                        // Fallback
+                        portNumber = 'Unknown';
+                        service = 'Unknown';
+                    }
+
+                    html += `<tr><td>${portNumber}</td><td>${service}</td></tr>`;
                 });
 
                 html += '</tbody></table>';
