@@ -151,12 +151,14 @@
                         console.log(`Port check for ${hostUrl}:`, data);
 
                         if (data.has_ports) {
-                            // Host has ports, change button color to green
+                            // Host has ports, change button color to blue and text to "View Ports"
                             button.classList.add('has-data');
+                            button.textContent = 'View Ports';
                             button.title = `${data.ports_count} ports already scanned`;
                         } else {
-                            // Host doesn't have ports, keep default color
+                            // Host doesn't have ports, keep default color and text
                             button.classList.remove('has-data');
+                            button.textContent = 'Scan Ports';
                             button.title = 'No ports scanned yet';
                         }
                     })
@@ -251,9 +253,10 @@
         document.querySelectorAll('.scan-button-sm').forEach(button => {
             button.addEventListener('click', function() {
                 const hostUrl = this.getAttribute('data-host-url');
+                const hostId = this.getAttribute('data-host-id');
 
                 // Show loading state
-                this.textContent = 'Scanning...';
+                this.textContent = 'Loading...';
                 this.disabled = true;
 
                 // Extract hostname from URL
@@ -265,9 +268,36 @@
                     console.error('Invalid URL:', hostUrl);
                 }
 
-                // Call the scan-ports API
-                console.log(`Calling scan-ports API for host: ${hostname}`);
-                fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
+                // First check if this host already has ports scanned
+                fetch(`/api/host/check-ports?url=${encodeURIComponent(hostUrl)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.has_ports && data.host_id) {
+                            console.log(`Host ${hostname} already has ${data.ports_count} ports scanned. Showing existing ports.`);
+
+                            // Reset button state
+                            this.textContent = 'View Ports';
+                            this.disabled = false;
+
+                            // Show existing ports instead of starting a new scan
+                            fetch(`/api/host/${data.host_id}/ports`)
+                                .then(response => response.json())
+                                .then(portsData => {
+                                    // Show the ports modal with existing data
+                                    showPortsModal(hostname, portsData.ports);
+                                })
+                                .catch(error => {
+                                    console.error(`Error fetching ports for ${hostname}:`, error);
+                                    alert(`Error fetching ports: ${error.message}`);
+                                });
+                        } else {
+                            // No existing ports, start a new scan
+                            console.log(`No existing ports for ${hostname}. Starting new scan.`);
+                            this.textContent = 'Scanning...';
+
+                            // Call the scan-ports API
+                            console.log(`Calling scan-ports API for host: ${hostname}`);
+                            fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
                     .then(response => {
                         console.log('Scan ports API response status:', response.status);
                         return response.json();
