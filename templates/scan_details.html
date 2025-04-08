@@ -183,7 +183,13 @@
                 // Add active class to clicked button and corresponding pane
                 this.classList.add('active');
                 const tabId = this.getAttribute('data-tab');
-                document.getElementById(tabId).classList.add('active');
+                console.log(`Activating tab: ${tabId}`);
+                const tabPane = document.getElementById(tabId);
+                if (tabPane) {
+                    tabPane.classList.add('active');
+                } else {
+                    console.error(`Tab pane with ID ${tabId} not found`);
+                }
             });
         });
 
