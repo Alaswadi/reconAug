@@ -834,6 +834,25 @@ a:hover {
     display: none !important;
 }
 
+.text-center {
+    text-align: center;
+}
+
+.view-all-button {
+    display: inline-block;
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+.view-all-button:hover {
+    background-color: #0b7dda;
+}
+
 /* Modal styling */
 .modal {
     display: flex;

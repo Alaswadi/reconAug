@@ -12,7 +12,7 @@
     </div>
 
     <div class="scan-form">
-        <form id="scanForm" action="/scan" method="post">
+        <form id="scanForm" action="/scan/scan" method="post">
             <div class="form-group">
                 <label for="domain">Domain:</label>
                 <div class="input-group">
@@ -31,26 +31,13 @@
 
 <div class="content-box">
     <div class="content-header">
-        <h2>Recent Scans</h2>
-        <a href="{{ url_for('main.history') }}" class="view-all-button"><i class="fas fa-list"></i> View All</a>
+        <h2>View Scan History</h2>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Domain</th>
-                <th>Date</th>
-                <th>Subdomains</th>
-                <th>Live Hosts</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="recentScansTable">
-            <tr>
-                <td colspan="5" class="text-center">Loading recent scans...</td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="text-center">
+        <p>View your scan history to see previous scan results and perform additional reconnaissance.</p>
+        <a href="{{ url_for('main.history') }}" class="view-all-button"><i class="fas fa-history"></i> View Scan History</a>
+    </div>
 </div>
 {% endblock %}
 
@@ -60,35 +47,6 @@
         const scanForm = document.getElementById('scanForm');
         const scanStatus = document.getElementById('scanStatus');
         const statusMessage = document.getElementById('statusMessage');
-        const recentScansTable = document.getElementById('recentScansTable');
-
-        // Load recent scans
-        fetch('/api/scans?limit=5')
-            .then(response => response.json())
-            .then(data => {
-                if (data.scans && data.scans.length > 0) {
-                    recentScansTable.innerHTML = '';
-                    data.scans.forEach(scan => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${scan.domain}</td>
-                            <td>${new Date(scan.timestamp).toLocaleString()}</td>
-                            <td>${scan.subdomains_count}</td>
-                            <td>${scan.live_hosts_count}</td>
-                            <td>
-                                <a href="/scan/details/${scan.id}" class="view-button-sm">View Details</a>
-                            </td>
-                        `;
-                        recentScansTable.appendChild(row);
-                    });
-                } else {
-                    recentScansTable.innerHTML = '<tr><td colspan="5" class="text-center">No scans found</td></tr>';
-                }
-            })
-            .catch(error => {
-                console.error('Error loading recent scans:', error);
-                recentScansTable.innerHTML = '<tr><td colspan="5" class="text-center">Error loading recent scans</td></tr>';
-            });
 
         // Handle form submission
         scanForm.addEventListener('submit', function(e) {
@@ -101,13 +59,14 @@
             scanStatus.classList.remove('hidden');
             statusMessage.textContent = 'Starting scan...';
 
+            // Create form data
+            const formData = new FormData();
+            formData.append('domain', domain);
+
             // Submit the form via AJAX
-            fetch('/scan', {
+            fetch('/scan/scan', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ domain }),
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
