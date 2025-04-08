@@ -62,10 +62,13 @@ def save_scan_results(domain, subdomains, live_hosts):
 
 def save_port_scan_results(host_url, ports):
     """Save port scan results to the database using a new app context"""
+    print(f"Saving port scan results for {host_url} with {len(ports)} ports")
     try:
         # Create a new Flask app and context
+        print(f"Creating Flask app context for {host_url}")
         app = create_app()
         with app.app_context():
+            print(f"Flask app context created for {host_url}")
             from reconaug import db
 
             # Normalize the URL for comparison

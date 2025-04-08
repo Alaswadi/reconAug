@@ -206,7 +206,10 @@ def run_gau_task(self, domain):
 @celery.task(bind=True)
 def run_port_scan_task(self, host):
     """Run port scan as a Celery task"""
+    print(f"Starting port scan task for {host}")
     try:
+        # Update task state to PROGRESS
+        print(f"Updating task state to PROGRESS for {host}")
         self.update_state(
             state='PROGRESS',
             meta={
@@ -215,10 +218,15 @@ def run_port_scan_task(self, host):
                 'message': f'Scanning ports for {host}...'
             }
         )
+        print(f"Task state updated for {host}")
 
+        # Run the port scan
+        print(f"Running port scan for {host}")
         ports, error = scan_ports(host)
+        print(f"Port scan completed for {host}. Found {len(ports)} ports. Error: {error}")
 
         if error:
+            print(f"Error scanning ports for {host}: {error}")
             return {
                 'status': 'error',
                 'message': f'Error scanning ports: {error}',

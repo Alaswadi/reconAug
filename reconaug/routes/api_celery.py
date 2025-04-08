@@ -190,15 +190,34 @@ def celery_scan_ports():
     if not host:
         return jsonify({'error': 'Host is required'}), 400
 
-    print(f"Scanning ports for {host}...")
+    print(f"\n\n==== API ENDPOINT: SCANNING PORTS FOR {host} ====\n\n")
 
-    # Start the Celery task
-    from reconaug.tasks import run_port_scan_task
-    task = run_port_scan_task.delay(host)
+    try:
+        # Start the Celery task
+        from reconaug.tasks import run_port_scan_task
+        print(f"Importing run_port_scan_task successful")
 
-    # Return the task ID
-    return jsonify({
-        'task_id': task.id,
-        'host': host,
-        'status': 'started'
-    })
+        # Check if Celery is connected
+        from reconaug.celery_app import celery
+        print(f"Celery ping: {celery.control.ping()}")
+
+        # Start the task
+        print(f"Starting Celery task for {host}...")
+        task = run_port_scan_task.delay(host)
+        print(f"Celery task started with ID: {task.id}")
+
+        # Return the task ID
+        return jsonify({
+            'task_id': task.id,
+            'host': host,
+            'status': 'started'
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error starting port scan task: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'error': f"Error starting port scan task: {str(e)}",
+            'host': host,
+            'status': 'error'
+        }), 500

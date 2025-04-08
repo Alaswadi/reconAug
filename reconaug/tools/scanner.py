@@ -91,17 +91,27 @@ def get_historical_urls(domain):
 
 def scan_ports(host):
     """Scan ports for a host using naabu"""
+    print(f"\n\n==== STARTING PORT SCAN FOR {host} ====\n\n")
+
     # Clean up the host - remove protocol and path if it's a URL
     clean_host = host
     if '://' in host:
         clean_host = host.split('://', 1)[1].split('/', 1)[0]
+        print(f"Removed protocol: {clean_host}")
 
     # Remove any port number if present
     if ':' in clean_host:
         clean_host = clean_host.split(':', 1)[0]
+        print(f"Removed port: {clean_host}")
 
     print(f"Scanning ports for host: {clean_host} (original: {host})")
+
+    # Create output directory if it doesn't exist
+    os.makedirs('output', exist_ok=True)
+    print(f"Ensured output directory exists")
+
     output_file = f"output/naabu_{clean_host}.txt"
+    print(f"Output file will be: {output_file}")
 
     try:
         # Check if naabu is available

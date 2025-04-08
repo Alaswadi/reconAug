@@ -299,9 +299,18 @@
                                 // No ports, start a scan
                                 this.textContent = 'Scanning...';
 
+                                console.log(`Starting port scan for ${hostname}`);
                                 fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
-                                    .then(response => response.json())
+                                    .then(response => {
+                                        console.log(`Port scan API response status: ${response.status}`);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
                                     .then(data => {
+                                        console.log(`Port scan API response data:`, data);
+
                                         // Keep the button in scanning state
                                         this.textContent = 'Scanning...';
                                         this.disabled = true;
@@ -311,7 +320,15 @@
 
                                         // Poll for task status
                                         if (data.task_id) {
+                                            console.log(`Starting task polling for ${data.task_id}`);
                                             pollTaskStatus(data.task_id, hostname, this);
+                                        } else {
+                                            console.error(`No task ID returned for ${hostname}`);
+                                            this.textContent = 'Error';
+                                            this.disabled = false;
+                                            setTimeout(() => {
+                                                this.textContent = 'Scan Ports';
+                                            }, 2000);
                                         }
                                     })
                                     .catch(error => {
