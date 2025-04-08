@@ -272,9 +272,17 @@
                                 fetch(`/api/celery/scan-ports?host=${encodeURIComponent(hostname)}`)
                                     .then(response => response.json())
                                     .then(data => {
-                                        this.textContent = 'Scan Ports';
-                                        this.disabled = false;
+                                        // Keep the button in scanning state
+                                        this.textContent = 'Scanning...';
+                                        this.disabled = true;
+
+                                        // Alert the user
                                         alert(`Port scan started for ${hostname}. Task ID: ${data.task_id || 'unknown'}`);
+
+                                        // Poll for task status
+                                        if (data.task_id) {
+                                            pollTaskStatus(data.task_id, hostname, this);
+                                        }
                                     })
                                     .catch(error => {
                                         console.error('Error scanning ports:', error);
@@ -371,6 +379,67 @@
                 liveHostsButton.click();
             }
         });
+
+        // Function to poll task status
+        function pollTaskStatus(taskId, hostname, button) {
+            console.log(`Polling task status for ${taskId}`);
+
+            // Poll every 2 seconds
+            const pollInterval = setInterval(() => {
+                fetch(`/api/celery/task/${taskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(`Task status for ${taskId}:`, data);
+
+                        if (data.status === 'complete' || data.status === 'error') {
+                            // Clear the interval
+                            clearInterval(pollInterval);
+
+                            if (data.status === 'complete') {
+                                // Update button to View Ports
+                                button.textContent = 'View Ports';
+                                button.disabled = false;
+                                button.classList.add('has-data');
+
+                                // Show the ports modal
+                                if (data.ports && data.ports.length > 0) {
+                                    showPortsModal(hostname, data.ports);
+                                } else {
+                                    alert(`No open ports found for ${hostname}`);
+                                }
+
+                                // Refresh the button colors
+                                checkExistingPorts();
+                            } else {
+                                // Error state
+                                button.textContent = 'Error';
+                                button.disabled = false;
+                                alert(`Error scanning ports: ${data.message || 'Unknown error'}`);
+
+                                // Reset after 2 seconds
+                                setTimeout(() => {
+                                    button.textContent = 'Scan Ports';
+                                }, 2000);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error polling task status for ${taskId}:`, error);
+
+                        // Clear the interval on error
+                        clearInterval(pollInterval);
+
+                        // Reset the button
+                        button.textContent = 'Error';
+                        button.disabled = false;
+
+                        // Reset after 2 seconds
+                        setTimeout(() => {
+                            button.textContent = 'Scan Ports';
+                        }, 2000);
+                    });
+            }, 2000);
+        }
 
         // Function to show ports modal
         function showPortsModal(host, ports) {
