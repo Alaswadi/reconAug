@@ -43,13 +43,13 @@
             </div>
 
             <div class="scan-details-tabs">
-                <button class="scan-tab-button active" data-tab="scanSubdomains">Subdomains</button>
-                <button class="scan-tab-button" data-tab="scanLiveHosts">Live Hosts</button>
+                <button class="scan-tab-button" data-tab="scanSubdomains">Subdomains</button>
+                <button class="scan-tab-button active" data-tab="scanLiveHosts">Live Hosts</button>
                 <button class="scan-tab-button" data-tab="scanHistoricalUrls">Historical URLs</button>
             </div>
 
             <div class="scan-tab-content">
-                <div id="scanSubdomains" class="scan-tab-pane active">
+                <div id="scanSubdomains" class="scan-tab-pane">
                     <div class="search-filter">
                         <input type="text" id="scanSubdomainsFilter" placeholder="Filter subdomains...">
                     </div>
@@ -69,7 +69,7 @@
                     </table>
                 </div>
 
-                <div id="scanLiveHosts" class="scan-tab-pane">
+                <div id="scanLiveHosts" class="scan-tab-pane active">
                     <div class="search-filter">
                         <input type="text" id="scanLiveHostsFilter" placeholder="Filter live hosts...">
                     </div>
@@ -173,23 +173,79 @@
             checkExistingPorts();
         });
 
+        // Log all tab buttons and panes for debugging
+        function logTabElements() {
+            console.log('Tab buttons:');
+            document.querySelectorAll('.scan-tab-button').forEach(btn => {
+                console.log(`  Button: ${btn.textContent.trim()}, data-tab: ${btn.getAttribute('data-tab')}, active: ${btn.classList.contains('active')}`);
+            });
+
+            console.log('Tab panes:');
+            document.querySelectorAll('.scan-tab-pane').forEach(pane => {
+                console.log(`  Pane: ${pane.id}, active: ${pane.classList.contains('active')}`);
+            });
+        }
+
+        // Function to activate a specific tab
+        function activateTab(tabId) {
+            console.log(`Manually activating tab: ${tabId}`);
+
+            // Remove active class from all buttons and panes
+            document.querySelectorAll('.scan-tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.scan-tab-pane').forEach(pane => pane.classList.remove('active'));
+
+            // Find the button with the matching data-tab attribute
+            const button = document.querySelector(`.scan-tab-button[data-tab="${tabId}"]`);
+            if (button) {
+                button.classList.add('active');
+                console.log(`Activated button: ${button.textContent.trim()}`);
+            } else {
+                console.error(`Button for tab ${tabId} not found`);
+            }
+
+            // Find the tab pane with the matching ID
+            const pane = document.getElementById(tabId);
+            if (pane) {
+                pane.classList.add('active');
+                console.log(`Activated pane: ${tabId}`);
+            } else {
+                console.error(`Pane with ID ${tabId} not found`);
+            }
+
+            // Log the updated state
+            logTabElements();
+        }
+
+        // Log tab elements on page load and ensure Live Hosts tab is active
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, logging tab elements:');
+            logTabElements();
+
+            // Ensure Live Hosts tab is active after a short delay
+            setTimeout(() => {
+                activateTab('scanLiveHosts');
+            }, 500);
+        });
+
         // Handle tab switching
         document.querySelectorAll('.scan-tab-button').forEach(button => {
-            button.addEventListener('click', function() {
-                // Remove active class from all buttons and panes
-                document.querySelectorAll('.scan-tab-button').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.scan-tab-pane').forEach(pane => pane.classList.remove('active'));
-
-                // Add active class to clicked button and corresponding pane
-                this.classList.add('active');
+            console.log(`Adding click handler to button: ${button.textContent.trim()}`);
+            button.addEventListener('click', function(event) {
+                console.log(`Tab button clicked: ${this.textContent.trim()}`);
+                // Prevent default behavior
+                event.preventDefault();
+                // Get the tab ID from the button
                 const tabId = this.getAttribute('data-tab');
-                console.log(`Activating tab: ${tabId}`);
-                const tabPane = document.getElementById(tabId);
-                if (tabPane) {
-                    tabPane.classList.add('active');
-                } else {
-                    console.error(`Tab pane with ID ${tabId} not found`);
-                }
+                console.log(`Tab button clicked, activating tab: ${tabId}`);
+
+                // Use our activateTab function
+                activateTab(tabId);
+
+                // Log the state after activation
+                setTimeout(() => {
+                    console.log('Tab state after activation:');
+                    logTabElements();
+                }, 100);
             });
         });
 
